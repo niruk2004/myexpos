@@ -1,0 +1,193 @@
+UNDERSTANDING THE FILE SYSTEM
+
+
+eXpFS:
+
+eXpOS assumes that the disk is a sequence of blocks, where each block can store a sequence of words.The number of words in a block is 
+hardware dependent. Generally, the hardware comes with machine instructions to transfer a block from the disk to a contiguous space in 
+memory and back. The eXpFS logical file system provides a file abstraction that allows application programs to think of each data 
+(or executable) file stored in the disk as a continuous stream of data (or machine instructions) without having to worry about the 
+details of disk block allocation. Thus eXpFS hides the details of physical storage from application programs. eXpOS provides a sequence
+of file system calls through which application programs can create/read/write data files. These system calls are OS routines that does
+the translation of the user request into physical disk block operations.
+
+
+there is an external interface through which executable and data files can be loaded into the file system externally. The details of 
+the external interface are implementation specific. The external interface for eXpOS implementation on the XSM machine is described 
+in XFS Interface.
+
+
+    eXpFS filesystem organization:
+
+    Associated with each eXpFS file there are three attributes - name, size and type, each attribute being one word long. The file name must
+    be a string. Each file must have a unique name. The size of the file will be the total number of words stored in the file. (The maximum 
+    size of a file is operating system dependent. In this implementation of eXpOS, it is 4 blocks at-most per file. Each block is 512 words and
+    there are 512 blocks in total.).
+
+    There are three types of eXpFS files - the root, data files and executable files. Each file in eXpFS has an entry in the root called its
+    root entry.
+
+
+        root file:
+
+        The root file has the name root and contains meta-data about the files stored in the file system. For each file stored in eXpFS, the root
+        file stores three words of information - file name, file-size and file-type.This triple( * In extended eXpOS, 5-tuple) is called the root
+        entry for the file. The first root entry is for the root itself.The operations on the root file are Open, Close, Read and Seek.The owner
+        of the root file is set to kernel (userid = 0) and permission set to exclusive (0) during file system formatting.The Root File is stored 
+        in the disk and has an entry for each file present in the disk (A copy of the Root File is maintained in the memory when the OS is running).
+        It consists of MAX_FILE_NUM entries. Thus eXpFS permits a maximum of MAX_FILE_NUM files. This version of eXpOS sets MAX_FILE_NUM = 60.
+        An unused entry is indicated by -1 in the FILE NAME field. Memory copy of the Root File is present in page 62 of the memory, and the SPL 
+        constant ROOT_FILE points to the starting address of data structure. eXpOS requires that the index of the inode table entry of a file and 
+        the index of its root file entry must match. For example, suppose the 5th entry of the inode table holds information about a file, then the 
+        entry for the same file in the root must be the 5th entry. XFS interface stores files into the disk following this convention.
+
+            a root file entry:
+
+                FILE NAME (1 word) - Name of the file
+                FILE SIZE (1 word) - Size of the file
+                FILE TYPE (1 word) - Specifies the type of the given file (ROOT indicated by 1 , DATA indicated by 2 or EXEC indicated by 3).
+                USER NAME (1 word) - Name of the owner of the file
+                PERMISSION (1 word) - Permission of the file; open-access (1) or exclusive (0)
+                Unused (3 words)
+
+
+
+
+        data file:
+
+        A data file is a sequence of words. The maximum number of words permissible in a file is defined by the constant MAX_FILE_SIZE (4blocks). 
+        (It is a recommended programming convention to use the extension ".dat" for data files). eXpFS treats every file other than root and 
+        executable files (will be described later) as a data file. The Create system call automatically sets the file type field in the root entry
+        for any file created through the create system call to DATA. The operations on the data file are Create, Delete, Open, Close, Read, Write,
+        Seek.Application programs can create only data files using the Create system call. In addition to this, data files may be loaded into the 
+        eXpFS file system using the external interface (see XFS Interface). If a data file is externally loaded into the file system (see XFS
+        Interface), the owner field is set to root (value = 1) and the access permission is set to open access (value = 1). 
+
+
+
+        executable file:
+
+        These contain executable code for programs that can be loaded and run by the operating system. From the point of view of the eXpFS file 
+        system alone, executable files are just like data files except that file type is EXEC in the root entry. eXpFS specification does not 
+        allow executable files to be created by application programs. They can only be created externally and loaded using the external interface 
+        (see XFS Interface for XSM architecture.). In Multiuser implementation of eXpOS, the access permission field for executable files is not 
+        used (value = -1). By default, the owner of all excecutable files is set to 0 (kernel).
+
+        Executable files are essentially program files that must be loaded and run by the operating system. Hence the Operating system imposes 
+        certain structure on these files (called the executable file format). Moreover, the instructions must execute on the machine on which the
+        OS is running. Thus, there is dependency on the hardware as well. Typically, an application program written in a high level language 
+        (like ExpL) is compiled using a compiler that generates the executable file. The compiler generates executable file that is dependent on 
+        the operating system as well as the target machine. 
+
+
+                XEXE Format:
+
+                The executable file format recognized by eXpOS is called the Experimental executable file (XEXE) format. In this format, an executable file 
+                is divided into two sections. The first section is called header and the second section called the code (or text) section. The code section 
+                contains the program instructions. The header section contains information like the size of the text and data segments in the file, the space 
+                to be allocated for stack and heap areas when the program is loaded for execution etc. This information is used by the OS loader to map the 
+                file into a virtual address space and create a process in memory for executing the program. 
+
+
+
+A high level language implementation for an OS comes with an Application Programmers Interface (API) for the OS system calls. API 
+describes the library functions which the application programs must invoke for each operating system call. The compiler will translate 
+the library call to corresponding low level interrupt calls as specified in the ABI. Thus, application programmers need to know only API.
+The ExpL compiler for eXpOS running on the XSM machine generates target code based on the ABI specification for eXpOS on XSM. Thus the ABI
+becomes the most important document for compiler back end design.
+
+
+
+
+XFS interface:
+XFS Interface (eXperimental File System Interface) is an external interface to access the eXpFS filesystem of the eXpOS "from the host (UNIX) system". 
+The filesystem is simulated on a binary file called disk.xfs. The interface can format the disk, dump the disk data structures, load/remove files, list files,
+transfer data and executable files between eXpFS filesystem and the host (UNIX) file system and copy specified blocks of the XFS disk to a UNIX file.
+
+
+
+
+
+eXperimental String Machine (XSM) consists of a processor, memory and disk.
+The package comes with three major support tools - two compilers and a disk interface tool called XFS-Interface. The compilers allow you to write high level 
+code and translate it into the XSM machine code.
+
+
+XSM machine's disk contains 512 blocks, each capable of storing 512 words. When files are stored in the disk, some format has to be followed so that one can 
+figure out where in the disk are the blocks of a file located.XSM disk is formatted to what is known as the eXpFS file system format. The format specifies 
+how data as well as meta-data for each file stored in the disk must be organized. The XFS interface tool allows you to load data files (and executable files 
+as well) from your Linux/Unix system into the XSM disk in accordance with the eXpFS format. The eXpFS format specifies that each data/executable file can span 
+across at most four data blocks, and that the index to these blocks along with the name and the size of the file must be stored in a pre-define area of the 
+disk called the Inode table. (The inode table is stored in disk blocks 3 and 4).There are also other pre-defined areas of the disk that stores meta data about
+the disk (root file, disk free list).
+
+
+inode table:
+The Inode table is stored in the disk and has an entry for each file present in the disk (A copy of the Inode table is maintained in the memory when the OS is 
+running). It consists of MAX_FILE_NUM entries. Thus eXpFS permits a maximum of MAX_FILE_NUM files. This version of eXpOS sets MAX_FILE_NUM = 60. Each Inode 
+table entry stores the name, size, type and data block numbers of a file stored in the disk ( * In Multiuser extension of eXpOS, userid and permission are also 
+included in the inode table entry). The current version of eXpOS limits the maximum number of blocks in an eXpFS file to MAX_FILE_BLOCKS = 4. Each Inode table
+entry consists of 16 words of which the 7 are unused in the present version of eXpOS. 
+
+    The entry of an Inode table has the following format:
+
+
+        FILE TYPE (1 word) - specifies the type of the given file (DATA, EXEC or ROOT). More information about file types is given here.
+        FILE NAME (1 word) - Name of the file
+        FILE SIZE (1 word) - Size of the file. Maximum size for File = MAX_FILE_SIZE = 2048 words
+        USER ID (1 word) - User Id of the owner of the file.
+        PERMISSION (1 word) - Permission of the file; it can be OPEN_ACCESS or EXCLUSIVE.
+        Unused (3 words)
+        DATA BLOCK 1 to 4 (4 words) - each DATA BLOCK column stores the block number of a data block of the file. If a file does not use a particular DATA BLOCK ,
+                                     it is set to -1.
+        Unused (4 words)
+
+eXpOS requires that the index of the inode table entry of a file and the index of its root file entry must match. For example, suppose the 5th entry of the 
+inode table holds information about a file, then the entry for the same file in the root must be the 5th entry. XFS interface stores files into the disk 
+following this convention.
+
+
+
+disk free list:
+The Disk Free List consists of DISK_SIZE entries. (The value of DISK_SIZE is fixed to 512 in the present version). Each entry is of size one word and thus, 
+the size of the disk free list is DISK_SIZE = 512 words. For each block in the disk there is an entry in the Disk Free List which contains either 0 (free) 
+or 1 (used).When the system starts up, the OS startup code loads the Disk Free List to memory. It is stored back when the system halts or a Shutdown system 
+call is executed.Memory copy of the Disk Free List is present in page 61 of the memory, and the SPL constant DISK_FREE_LIST points to the starting address 
+of the table.
+
+
+
+stage2:
+
+load --data data_path : loads the file in the data_path to the expfs. done in xfs
+
+copy 3 4 $HOME/myexpos/inode_table.txt : copies block 3 and 4 to inode_table.txt
+
+dump --inodeusertable : makes a file named inodeusertable.txt and dumps the inode table to it. this file resides in the xfs-interface
+
+export xfs_file file_path :  exports the xfs_file to your system 
+
+what is the need for both root and inode?:
+    Inode table is a data structure which is accessible only in Kernel mode, whereas Root file is accessible both in Kernel and User mode. 
+    This enables the user to search for a file from an application program itself by reading the Root file.
+
+assignment 1:
+
+#copy 5 5 $HOME/myexpos/root_file.txt
+now check if the 9 th line has the sample.dat entry
+
+
+assignment 2:
+
+#rm sample.dat
+
+#dump --inodeusertable
+now check whether the 18th line has sample.dat it is not supposed to be there anymore. 17th line has filetype in it.
+
+#copy 5 5 $HOME/myexpos/root_file.txt
+now check if the 9th line has sample.dat . it is not supposed to be there anymore.
+
+
+# copy 2 2 $HOME/myexpos/disk_free_list.txt
+now check if the 70th line is 0 or 1 (it is 70th because the blocks start from 0 and the sample.dat was on 69th block 
+and hence 70th line). it is supposed to be 0.
