@@ -1,0 +1,18 @@
+SETTING UP THE SYSTEM
+
+
+*pre reqisites such as gcc, make, readline, flex/lex, bison/yacc are downloaded
+
+The expl folder contains the expl compiler required to compile user programs to XSM machine instructions. 
+
+The spl folder contains the SPL (System Programmer's Language) Compiler required to compile system programs (i.e. operating system routines) 
+to XSM machine instructions.
+
+The xfs-interface contains an interface (XFS Interface or eXperimental File System Interface) through which files from your UNIX machine can 
+be loaded into the File System of XSM. The interface can format the disk, dump the disk data structures, load/remove files, list files, transfer 
+data and executable files between eXpFS filesystem and the host (UNIX) file system and copy specified blocks of the XFS disk to a UNIX file. 
+
+
+The xsm  contains the machine simulator (XSM or eXperimental String Machine).
+
+The test contains  contains the test scripts for eXpOS
