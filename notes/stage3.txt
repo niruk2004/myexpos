@@ -1,0 +1,363 @@
+BOOTSTRAP LOADER
+
+
+
+
+
+Machine Organization:
+
+Processor:
+
+The processor consists of a set of registers and ports along with the hardware for performing control and arithmetic/logic 
+operations, paging etc. Each register/port can store a string. The machine is equipped with an instruction set. Two contiguous
+memory words are necessary to store each XSM instruction. The processor has two fundamental modes of operation - privileged 
+execution mode and the unprivileged execution mode. A program executing in the privileged mode can execute any XSM instruction 
+and has the full view of the memory and the disk. A program executing in the unprivileged mode has access only to a restricted 
+machine model called the XSM virtual machine. The instruction set and the memory model available to a program executing in 
+unprivileged mode is a subset of that in the privileged mode. These are called the virtual machine instruction set and the 
+virtual machine memory model respectively. XSM implements the virtual machine model using its paging hardware. The hardware 
+paging scheme of XSM maps the virtual address space of a user mode program to the physical address space of the machine.
+
+XSM Machine register/ports:
+
+The XSM architecture maintains 29 registers, each capable of storing a word. Only a few of them are accessible in unprivileged mode.
+Several registers are special purpose registers reserved for specific purposes. The machine also contains 4 ports, of which one 
+port is used for Standard Input and another one is used for Standard Output. The remaining ports are unused in the present version 
+of XSM.
+
+  .  Registers 	                                           Purpose 	                                                             Access Mode
+
+ #  *R0-R19 	                                  General Purpose User Registers
+   . .                                    (R16-R19 are reserved for the use of SPL compiler) 	                                     Unprivileged
+ #   BP, SP, IP 	                                Base, Stack and Instruction Pointers 	                                           Unprivileged
+ #  PTBR, PTLR 	                                Page Table (Base, Length) Registers 	                                              Privileged
+ #  EIP, EC, EPN, EMA 	                           Exception Status Registers 	                                                    Privileged
+ #  P0-P3  	                                    P0-Input port, P1-Output port
+   (ports)                                            P2,P3-Unused 	                                                                Privileged
+
+* The registers R12 - R15 (both inclusive) must be used by the system programmer with caution as they may be used by the OS.
+
+
+Memory:
+
+Memory refers to the physical memory of the machine and is a volatile storage. The memory is organized as a sequence of pages. Each page 
+is a sequence of 512 words. The total number of memory pages available is 128. Thus there are in total 512 x 128 = 65536 words of storage. 
+The memory is word addressable. The machine contains data transfer instructions that allow a word to be transferred from memory to a 
+register/port and back.
+When the machine is executing in privileged mode, a memory address “N” between 0 and 65535 refers to the word with offset (N mod 512) 
+in page number (N div 512). 
+Out of the 128 pages, the first 40 pages are reserved for stuff like boot block, rom code, exception handler, interrupts etc. page 0 is 
+ROM code. the last 19 words of the page 0 is reserved for interrupt vector tabel with 19 entries. kth entry contains the page number where 
+the handler of the kth interrupt service routine begins. upon encountering the int k instruction , the machine transfers control to the 
+beginning of the page indicated in the corresponding vector table entry. The version of the XSM machine described here assumes that the 
+vector table entries are hard coded in the ROM code. 
+
+
+
+Disk:
+
+The disk is organized as a sequence of 512 blocks. Each block is a sequence of 512 words. Thus there are a total of 512x512=262144 
+words of secondary storage.The disk is block accessible and not word accessible. This means that a word within a block can be 
+accessed individually only after transferring the block into memory and then accessing the corresponding word from the memory.A 
+block index between 0 and 511 refers to the corresponding disk block.The block 0 of the disk is reserved for boot block and will 
+be loaded into the memory at the time of system startup.The machine instruction set includes four special disk access macro 
+routines (load, loadi and store (fourth one is most probably backup)) for disk-block to memory-page data transfer and back. These are actually 
+macros whose internal details are hidden from programs. These macros are accessible only when the machine is executing in privileged 
+mode. XSM gives no provision for programs to access the disk directly while executing in unprivileged mode.
+The fact that both page-size and block-size are the same makes disk to memory transfer easy in XSM. In real machines, this is normally 
+not the case and the disk access routines have to do the necessary size mappings.
+
+
+Every instruction in XSM is 2 words long. The instructions provided by the XSM architecture can be classified into unprivileged (user) 
+and privileged (kernel) instructions. The semantics of each instruction is different, depending on the mode in which the machine is running.
+
+   Unprivileged Instructions:
+
+   XSM provides a set of unprivileged instructions, which are the only instructions available when the machine is executing in the user mode. 
+   The machine can execute unprivileged instructions in kernel mode also, however, the instruction semantics will be different as explained in 
+   Paging hardware. The unprivileged instructions are Data Transfer Instructions, Arithmetic Instructions, Logical Instructions, Stack 
+   Instructions, Sub-routine instructions, Debug instructions and Software interrupts. Registers available in user mode are R0-R19, SP, BP and IP.
+
+      Types of Unprivileged Instructions:
+            Data Transfer Instructions
+            Arithmetic Instructions
+            Logical Instructions
+            Branching Instructions
+            Stack Instructions
+            Subroutine Instructions
+            Debug Instruction
+            Software Interrupts
+            NOP Instruction
+
+
+   Privileged Instructions:
+
+   Privileged instructions can be executed only in the kernel mode (both priviliged instructions and unpriviliged instructions can be executed 
+   in the kernel mode). It should be noted that all the addresses in the kernel mode should be physical addresses, whereas the user mode uses 
+   logical addresses, with address translation done using the Paging hardware. 
+
+      Types of Privileged Instructions:
+            LOADI
+            LOAD
+            STORE
+            ENCRYPT
+            BACKUP
+            RESTORE
+            PORT
+            IN
+            INI
+            OUT
+            IRET
+            HALT
+
+
+
+Timer:
+
+Disk Controller is the device that controls the data transfer between the memory and the disk. If the load macro or store macro is used for 
+disk-memory transfer, then upon subsequent completion of XSM_DTIME instructions in the unprivileged mode, the disk controller interrupts the 
+machine. (If the XSM_DTIME numbered instruction changes mode from unprivileged to privileged, then the interrupt occurs before executing the 
+next instruction after the machine is back to unprivileged mode). Upon receipt of the interrupt, the machine executes disk interrupt service 
+routine. If the loadi macro is used for disk-memory transfer, the machine will wait for the block transfer and will continue the execution of 
+next instruction only after the block transfer is complete. 
+
+
+
+Disk Controller:
+
+Disk Controller is the device that controls the data transfer between the memory and the disk. If the load macro or store macro is used for 
+disk-memory transfer, then upon subsequent completion of XSM_DTIME instructions in the unprivileged mode, the disk controller interrupts the 
+machine. (If the XSM_DTIME numbered instruction changes mode from unprivileged to privileged, then the interrupt occurs before executing the 
+next instruction after the machine is back to unprivileged mode). Upon receipt of the interrupt, the machine executes disk interrupt service 
+routine. If the loadi macro is used for disk-memory transfer, the machine will wait for the block transfer and will continue the execution of 
+next instruction only after the block transfer is complete.
+
+
+
+Console/Terminal:
+
+The console device is a single device that handles the standard input and output.The OUT instruction displays the contents of port P1 onto the 
+terminal (see instruction set).If the XSM machine executes an IN instruction, the console device waits for the user to enter a word into the 
+console. When a word is entered, the console device transfers the word to the port P0 and raises the console interrupt. The console device ignores 
+any further input entered by the user before the execution of another IN/INI instruction. While the console waits for the user input, the XSM machine 
+proceeds the execution of the next instruction.If the XSM machine executes the INI instruction (which can be used only in debug mode), the console 
+device as well as the XSM machine waits for the user input and the data entered is immediately transferred to the port P0, only after which the next 
+instruction is executed. No interrupt is generated by the INI instruction.The contents of port P0 may be transfered to other registers/memory using 
+the MOV instruction inside the console interrupt routine. Note that P0 will contain valid data only after the console has sent an interrupt for the 
+IN instruction.
+
+
+
+Boot ROM and Boot block:
+
+When XSM machine starts up, program execution starts at the first word of the first page (Page 0) of memory. There is a pre-loaded ROM code in 
+Page 0 called the bootstrap loader. This code loads the 1st disk block (block 0) called the boot block from the disk to page 1 of memory and 
+then transfers control (using the jump instruction) to the 1st instruction in page 1. This mechanism allows programmers to write their code 
+and store it in the boot block so that when the machine starts up, control is transferred to this code. 
+The XSM machine has an interrupt vector table that maps each interrupt number to a corresponding address (of the interrupt handler). The 
+vector table is stored starting from physical address 492 of memory. Locations 492,493,494 and 495 stores the addresses of exception handler, 
+timer interrupt handler, disk interrupt handler and console interrupt handler. Location 496 contains the address of the first trap handler - 
+INT 4, location 497 contains address of INT 5 handler and so on. When the machine encounters an INT n instruction, the corresponding ROM 
+location is searched for the handler address and IP is set to this value. Note that the interrupt vector table is hard-coded in the ROM code 
+of the XSM simulator given to you, you cannot change the addresses of the handlers. This refers to the 19 words reserved for the interrupt 
+vector table that is mentioned in memory section. Boot ROM code contains just 2 instructions (to load the Boot Block to page 1 and then 
+jump to page 1 which now contains Boot Block). So, after the execution of Boot ROM, control is transferred to 1st instruction in page 1.
+The interrupt routines are not considered to be instructions that are to be excecuted so it is not included. They are present in the boot
+ROM page itself. 
+
+
+
+
+
+
+
+
+
+
+
+XSM Instruction Execution Cycle:
+
+The ExpOS documentation (unfortunately) uses the words "kernel mode" for privileged mode and "user mode" for unprivileged mode execution. 
+This terminology arose because the OS kernel code runs in privileged mode and application programs run in unprivileged mode. However "kernel" 
+and "user" are OS level abstractions, not connected to the machine, and the terminology is not used in this document while referring to 
+architectural concepts. 
+
+
+Boot-up:
+
+All registers will be set to value zero. In particular, IP register also assumes value 0. Once powered on, the machine will start repeatedly 
+executing the following fetch-execute cycle in privileged mode. 
+
+1. Transfer the contents of two memory locations starting at the address stored in IP register to the CPU. The XSM machine treats the contents 
+   read like a machine instruction. This action is called the instruction fetch cycle.
+2. The next step is the execute cycle where the instruction fetched in Step 1 is executed by the machine. What happens here depends on the 
+   instruction. (See XSM instruction set.) For example, if the instruction fetched is "MOV R0, [1256]", the execute cycle action will result 
+   in the contents of memory location 1256 being transferred to register R0. If the instruction fetched is "JMP 1110", the value of the IP 
+   register will be set to 1110.
+3. The final step is to set the instruction pointer to the next instruction to be executed. Since each XSM instruction is two words, IP will 
+   normally be incremented by 2. There are exceptions to this rule. For instance in the case of "JMP 1110", IP is set to 1110 and hence not 
+   incremented. Thus the next fetch must be from 1110. After Step 3, the machine loops back to Step 1.
+
+
+When the machine is just powered on, IP value is 0. Hence, the first instruction will be fetched from memory locations 0 and 1. The XSM 
+machine has a boot ROM containing just two instructions: 
+- LOADI 1,0 for loading the contents of disk block 0 to page 1 . This instruction is at location 0
+- JMP 512 for jumping to the next page to start executing the contents of page 0 whcih contains block 0 which was loaded to it in the 
+  loadi instruction at location 0. THis instruction is at location 2.
+
+The bootstrap code is hard coded into a boot ROM so that the memory contents are not lost even after machine shutdown. This is necessary 
+because when the machine is powered on, there must be some meaningful instruction at address 0 from where the first fetch takes place. 
+
+PUSH, POP, CALL and RET:
+
+The value of the SP register holds a pivotal role in these operations.
+
+PUSH:
+
+1. Contents of SP gets incremented by 1.
+2. The data specified by the PUSH instruction is transferred to the location pointed to by SP.
+3. IP gets incremented by 2 to point to the next instruction
+
+MOV SP, 1000   //  SP register is loaded with value 1000.
+PUSH R0    //  SP is set to 1001 and contents of R0 is copied to memory address 1001.
+
+
+POP:
+
+The POP instruction is a reverse operation to PUSH. The contents of the memory address pointed to by SP will be retrieved to a register 
+specified, and SP is decremented. 
+
+
+CALL:
+
+1. Increment SP by one.
+2. Transfer contents of IP register + 2 to the memory address pointed to by SP.
+3. Set IP to the value of register/constant value specified in the CALL instruction.
+
+MOV SP, 1000  //  SP is set 1000
+CALL 21110   //  a) Increment SP to1001, b) Copy contents of IP to location 1001 c) MOV 21110 to IP register.
+
+As a consequence, the next instruction fetch will happen from address 21110.
+
+
+RET:
+
+MOV SP, 1000     // SP = 1000
+MOV IP, 2000     // IP = 2000
+CALL 21110       // SP = 1001, IP = 21110, memory[1001] = 2002
+...              // Execute instructions at 21110
+RET              // Pop 2002 from SP, set IP to 2002 and SP is set to 1000
+
+After the instruction at 21110 is executed, the next instruction is not automatically fetched from the stack pointer. Instead, it depends on 
+the flow of execution:
+   Two Possible Scenarios
+   1. No RET Instruction:
+      If the instruction at 21110 does not involve returning (e.g., RET) and simply continues execution, the next instruction will be fetched 
+      from 21112 (the next sequential address in memory).
+
+   2. With a RET Instruction:
+      If the instruction at 21110 eventually executes a RET, the processor will:
+         Pop the return address (stored earlier during CALL) from the stack.
+         Set the IP to the popped value, which is the return address (2002 in this example).
+         The next instruction will be fetched from this return address (2002), resuming execution after the CALL.
+
+
+
+IRET:
+This instruction can be only executed in privileged mode, but IRET is the only XSM instruction that results in the XSM machine to switch from 
+the privileged mode to unprivileged mode. After an instruction fetch, if the XSM encounters the IRET instruction, the following actions take 
+place:
+   1. Enable paging and change from privileged mode to unprivileged mode
+   2. Execute the RET instruction in the unprivileged mode. (The execution semantics now is different, and you must read XSM unpriviliged 
+      mode execution to understand how RET works in unprivileged mode).
+
+After the IRET instruction, the machine continues fetch-execute cycle, but in the unprivileged mode. Note that the change of machine mode 
+from privileged to unprivileged happens before the actual fetch-execution cycle. Thus, to understand how an instruction works, one needs to 
+know how paging and address translation works. 
+
+
+
+
+
+
+main stage work:
+
+
+
+process of writing hello world in assembly language to block 0 of the disk so that when the rom boot occurs, it loads the block containing 
+this hello world (block 0) and shows the output
+
+Create the assembly program to print "HELLO_WORLD".
+The assembly code to print "HELLO_WORLD" :
+
+MOV R0, "HELLO_WORLD"
+MOV R16, R0
+PORT P1, R16
+OUT
+HALT 
+
+what this does is move hello world to r0. then it copies it to r16 and then using the port function , it is copied to output port (p1) and 
+it is printed using the OUT function. Then the execution is halted using the HALT function.
+
+it is copied from r0 to r16 because r16-r19 are reserved for the spl and hence we use it .
+
+save this by making a folder in spl named spl_progs .
+Load the file as OS Startup code to disk.xfs using XFS-Interface. Invoke the XFS interface and use the following command to load the OS 
+Startup Code
+
+cd $HOME/myexpos/xfs-interface
+./xfs-interface
+# load --os $HOME/myexpos/spl/spl_progs/helloworld.xsm
+# exit
+
+
+load --os loads the file to block 0 of the XFS disk.
+
+
+
+Run the machine
+
+cd $HOME/myexpos/xsm
+./xsm
+
+The XSM simulator given to you is an assembly language interpeter for XSM. Hence, it is possible to load and run assembly 
+language programs on the simulator (unlike real systems where binary programs need to be supplied).
+
+
+Assignment question
+Write an assembly program to print numbers from 1 to 20 and run it as the OS Startup code.
+
+
+// OS Startup Code to print numbers from 1 to 20
+MOV R0, 1          // Initialize R0 to 1 (starting number)
+MOV R1, 20         // Initialize R1 to 20 (ending number)
+
+PRINT_LOOP:
+    MOV R2, R0      //Move the number to R2 (making a copy since the LE changes the value in first register)
+    MOV R16, R2     // Move the current number to R2 (print register)
+    PORT P1, R16    // Output the number to Port P1
+    OUT            // print output
+    INR R0         // Increment R0 by 1
+    INR R2         // Increment R2 by 1
+    LE R2, R1     // Compare R2 with R1. R2 has 1 if R2 <= R1.
+    JZ R2,END        // If R2=0, jump to END
+    JMP PRINT_LOOP // Otherwise, continue the loop
+
+END:
+    HALT           // Stop the program
+
+
+note: There should not be any comments on the same line as a command. It should be done on the next line.
+
+save the code in spl_progs. name the file print1to20.xsm
+
+now load the code using 
+cd $HOME/myexpos/xfs-interface
+./xfs-interface
+# load --os $HOME/myexpos/spl/spl_progs/print1to20.xsm 
+# exit
+
+now run the xsm :
+../xsm/xsm (assuming u are currently inside the xfs-interface folder)
+
+.
