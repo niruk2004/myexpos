@@ -1,0 +1,159 @@
+Running a User Program
+
+
+XSM Virtual Machine Model:
+
+The Virtual Machine model defines the view of the machine to user mode programs. User mode programs are executed in 
+the unprivileged mode. Consequently, the privileged mode instructions cannot be used by them. Their memory view and 
+registers available are also limited.
+
+    Virtual Machine Organisation:
+    The XSM virtual machine model defines the machine model provided by XSM to a program running in user mode. This
+     model comprises of a restricted subset of the machine registers, a restricted instruction set and a restricted 
+     memory address space (called the virtual/logical address space).
+
+    Registers R0-19 and IP,BP and SP are available in unprevilaged mode.
+
+    Virtual address for the user programs is determined by the value of the PTLR register. The virtual address space 
+    of user mode program is a contiguous address space starting from 0 to 512*PTLR-1. The virtual addreses generated 
+    by a user mode program are translated into physical addresses by the address translation scheme of XSM which is 
+    oblivious to the user mode program.Operating systems using the XSM architecture typically specifies the maximum 
+    value of PTLR permitted for its user processes and divide the allocated address space for an application into 
+    library, code, data, stack, heap etc. 
+    
+    A total of 15 software interrupts are available to a user mode program (Interrupt 4 - Interrupt 18).
+
+    Every instruction in XSM can be categorized into :
+        Data Transfer Instructions
+        Arithmetic Instructions
+        Logical Instructions
+        Branching Instructions
+        Stack Instructions
+        Subroutine Instructions
+        Debug Instruction
+        Software Interrupt
+
+XSM Paging Hardware and Address Translation :
+
+The hardware paging scheme of XSM maps the virtual address space of a user mode program to the physical address 
+space of the machine.
+
+    Page Table:
+    Every user mode program has an associated page table which maps its virtual address space to the machine's 
+    physical address space. For the hardware address translation to work, the base address of the Page Table 
+    (of the user mode program currently in execution) must be stored in the Page Table Base Register (PTBR) 
+    and the number of entries in this Page Table must be stored in the Page Table Length Register (PTLR). 
+    The page tables must be set up in the privileged mode.
+
+    Each page table entry for a logical page is of 2 words. First word is the physical page number where the 
+    logical page is actually loaded. The second word stores a sequence of flag bits containing the auxillary 
+    info - reference bit , valid/invalid bit , write permission bit, dirty bit. Reference bit refers to whether 
+    the page loaded is referenced atleast once after initializing. It is 0 on initialization and set to 1 as 
+    soon as it is accessed for the first time. valid/invalid bit refers tto whether the page table entry is 
+    valid or not. It is 1 if it is valid. If memory access is made to an invalid page table entry, exception 
+    handler routine is done. Write permission bit refers to whether the user mode program is permitted to 
+    write into page. It is 1 if yes. If we try to write when the bit is 0, the exception handler routine is 
+    run. Dirty bit refers to whether the page contents were changed or not. It is 1 if there was any changes 
+    made to the page.
+
+    Address translation scheme:
+    So in the memory, there is page table which is divided into sets of 20 for giving to each process. 10 pages 
+    can be mapped here (each page requires 2 entries). PTBR stores the starting of this page table. PTBR to 
+    PTBR+20 is the page table for a process. The next page table is PTBR+20 to PTBR+40. So Location of page 
+    table entry = PTBR + 2 x (Logical Address / 512). Physical page number will be there in the first word of 
+    this location. offset = Logical Address % 512 and hence the physical address is computed by 
+    Physical Address = Physical Page Number x 512 + offset.
+
+XSM Unprivileged Mode of Execution:
+
+In the privileged mode, a memory address refers to the actual physical memory address. For instance, the 
+instruction sequence:
+
+MOV SP, 1000
+PUSH R0
+
+
+The first instruction sets stack pointer register SP to 1000. The PUSH instruction will first increment SP 
+(to value 1001) and then transfers contents of the register R0 to the top of the stack - that is - to the 
+memory location 1001 pointed to by SP.
+However, PUSH and other unprivileged instructions have a different behaviour when executed in unprivileged 
+mode. PUSH will increment SP to 1001 as before, but the memory address to which contents of R0 is copied is 
+determined in a different way. The machine will treat the contents of SP as a logical address, find out the 
+physical address corresponding to the logical address 1001 using the address translation mechanism of XSM 
+and transfer contents of R0 to that location. So it takes 1001 and take its quotient and remainder when 
+divided by 512 to get the logical page number and offset and use that to find the physical page number 
+and then the physical address. So the value in R0 is stored in this physical addreses. 
+
+Q: Why do we need this unprevilaged mode? 
+A: To prevent malicious user programs from affecting the OS or other user programs.
+
+The OS maintains a seperate page table for each program that stores the physical page number to which each 
+logical page of the program is mapped to. Note that the page table is a "meta data" about a program maintained 
+by the OS. The OS stores the table outside the address space of the process and the process has no access to it. 
+
+Setting up the page for an application:
+
+1)Set the PTLR register to define the address space maximum limit.
+The ExpOS kernel that you design sets the address space of every application to 10 pages
+
+2)Set up a valid page table in memory and the PTBR register to the beginning address of the page table of the 
+particular application.
+Loading application to address space:
+For the 10 pages assigned to a process, first 2 pages are for library, next 2 for heap , next 4 for code and 
+last 2 for stack. Also in the code , the first 8 address is for header. Then only the instruction starts.
+since code pages are expected not to be modified during program execution, the Write permission bit must be set 
+to 0. (Setting write permission to 0 for code pages is a necessary exercise. A typical multi-tasking OS will 
+permit several applications to share code pages in memory. It then is the duty of the OS to ensure that one 
+application doesn't modify the shared code to "hack" others.
+
+3)Set up the application's stack. Set SP to point to the top of the stack.
+ The pages allocated for stack must be writable, and hence the write permission for these pages must be set 
+ in the page table. Normally an application's run-time data will be stored in the stack. Arguments to function 
+ calls in the application and return values are also normally passed through the stack.  before an application 
+ is run for the first time, the stack pointer register SP is set to value 4095 (why not 4096? because when we 
+ insert something to stack, we first increment the stack pointer and then store the value in that address so 
+ that the SP contains the top most address at all times).
+
+4)Compute the physical address corresponding to the logical address in SP. Then, copy the logical address of 
+the first instruction (entry point) that much be fetched after IRET into this physical memory location and 
+execute IRET.
+ An eXpOS compatible XEXE executable file must contain instructions listed in sequential order. But before the 
+ code, the file must contain an eight-word header. The code follows the header. The first word 
+ (word 0) must be set to value 0. For the time being, we will be concerned only about the second word 
+ (word 1) called entry point. This word must contain the logical address of the first instruction to be 
+ executed when the application is run. The values of the remaining six words can be ignored. 
+
+
+
+Stage :
+
+Q1. Suppose the machine is executing in unprivileged mode. Assume that the following are some of the register values:
+IP: 3000, PTBR: 29696, SP: 5000, PTLR: 10 
+
+Which physical memory location will contain the physical page number of the page from which the machine will 
+fetch the next instruction? 
+This is found by finding 29696 + 10 since it would give us the logical page 4's physical memory location which 
+contains the physical page number.
+
+Suppose further that the memory location 29706 contains value 100. What will be the physical memory address 
+from which the XSM machine will fetch the next instruction? 
+We know that the IP is 3000 so take the offset which is 440 (3000 % 512= 440) and the page number is 100 .
+So the physical addreses is 51200+440 which is 51640.
+
+Suppose the instruction stored at memory address 51640 is JMP 3080, which all registers will be updated? 
+Only the IP will be updated to 3080.
+
+Suppose the instruction stored in memory address was MOV R0,[4096]. From which physical address will value be 
+fetched and transferred to register R0? Assume that the value stored in memory address 29712 is 75. 
+Take the quotient which is 8 (4096 / 512 =8). Now go to the phsyical address 29712 ( which is 29696 + (2*8) ).
+In that address the given physical page number is 75. So we take 75*512 which gives 38400.
+
+Suppose the instruction stored at memory address 51640 was MOV R0, [7000], what will happen? 
+We try to convert the value at logical address 7000 first. While trying to find that , we see that 7000 / 512 gives 
+13 which is grater than the PTLR value implying that this is an illegal access and hence there will be an exception.
+
+IN this stage , what we basically do is create a user program in expl (init / login code) and then make an os starup 
+code in spl where it loads the init code, int 10 and exception handler code to memory from the disk and also sets up 
+the page table for the init process , sets the stack pointer value top of stack where we assign it to the starting 
+address of the instructions and finally calls ireturn where the mode changes to user mode which results in IP getting 
+the top of the stack value implicitly and then executing them.
