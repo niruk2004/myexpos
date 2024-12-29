@@ -1,0 +1,58 @@
+Handling Timer Interrupt:
+
+XSM machine supports three hardware interrupts - timer interrupt, disk interrupt and console 
+interrupt. Associated with each interrupt, there is an interrupt handler routine. These handler 
+routines are called timer interrupt handler, disk interrupt handler and the console interrupt 
+handler respectively. The addresses of these handlers are stored in locations 493, 494 and 495 
+of the ROM and are preset to values 2048, 3072 and 4096. Thus, the OS bootstrap code must load 
+the timer interrupt handler into memory starting from 2048, disk interrupt handler from address 
+3072 and console interrupt handler from 4096.
+
+
+Timer Interrupt
+
+XSM has a timer device which can be set to interrupt the machine at regular intervals of time. 
+You can run the XSM simulator with the option - - timer:
+
+xsm --timer 10
+
+this means that after every 10 instructions:
+
+    1)Push the IP value into the top of the stack.
+
+    2)Set IP to value stored in the interrupt vector table entry for the timer interrupt handler. The 
+    vector table entry for timer interrupt is located at physical address 493 in page 0 (ROM) of XSM 
+    and the value 2048 is preset in this location. Hence, the IP register gets value 2048. The machine 
+    then switches to to privileged mode and address translation is disabled. Hence, next instruction 
+    will be fetched from physical address 2048. 
+
+If the value in the SP register after incrementing SP is an invalid address (i.e., not in the range 0 
+to PTLR*512-1) then the machine generates an illegal memory access exception.
+
+Interrupts are disabled when machine runs in the privileged mode so that there are no race conditions. 
+After returning from the timer interrupt handler, the next entry into the handler occurs only after the 
+machine executes another ten instructions in user mode.
+
+The timer device can be used to ensure that privileged code gets control of the machine at regular 
+intervals of time. This is necessary to ensure that an application once started is not allowed to run 
+"forever." In a time-sharing environment, the timer handler invokes the scheduler of the OS to do a 
+context switch to a different process when one process has completed its time quantum.
+
+In a real systems, the OS loads into the memory the timer device's driver during bootstrap. (Here, 
+the driver is assumed to have been pre-loaded into the disk. However modern systems also permit 
+drivers to be loaded at run time without re-booting the OS) After this, some kernel boot code 
+will invoke the appropriate functions of the device driver to perform initial configuration of the 
+timer device so as to interrupt the machine at regular intervals of time. The timer device will have 
+some output wire that (after passing through several intermediate hardware circuits) connects to some 
+interrupt pin of the CPU. The OS bootstrap code will instruct the device driver to configure the device 
+in such manner that the device sends a signal to the interrupt pin at regular intervals of time. Each 
+time such signal is received, the CPU saves the next instruction's IP value to the stack and transfers 
+control to the interrupt routine.
+
+Thus, it is important to understand that the XSM machine is a software simulated machine and hence 
+deviates from real systems. No real life CPU comes with hardware that counts the number of instructions 
+and invoke the timer interrupt handler after a pre-set number of instructions as XSM machine does. The 
+same comment holds for the disk and the console interrupts as well. 
+
+In the stage basically we just added the timer file and compiled it. Then we loaded the timer file to 
+memory during the OS startup.
