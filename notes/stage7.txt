@@ -1,0 +1,136 @@
+ABI and XEXE Format:
+
+ABI can be defined as the interface between user program and the kernel
+ABI defines the following:
+The machine model - that is, the instruction set and the virtual memory address space to which an 
+application/compiler generating executable file must generate target code for. This is very much 
+architecture specific.
+
+A logical division of the memory address space into regions - text, stack, heap and library and 
+the low level (assembly/machine level) system call interface. This part is dependent on both the 
+OS and the architecture. 
+
+The file format to be followed for executable files by the compiler (the XEXE executable file 
+format). This part is generally OS specific and architecture independent. Compilers must generate 
+executable files adhering to this format.
+
+A low level system call interface which gives the specification of the software interrupt 
+instruction (trap) corresponding to each system call and the order in which arguments must be 
+passed to the system call through the application program's stack.This part is architecture dependent.
+
+The low level runtime library interface : The low level runtime library interface consists of user level 
+routines which provide a layer of abstraction between the low level system call interface and the 
+application program by providing a unified interface for all system calls, hiding low level interrupt 
+details from the application. (Applications however, may choose to bypass this layer and directly 
+invoke the low level system calls.) In addition to the system call interface, application level dynamic 
+memory allocator and deallocator functions are also part of the eXpOS library. 
+
+Virtual Address space Model:
+The (virtual) address space of any eXpOS process is logically divided into four parts namely Shared 
+Library, Heap, Code and Stack. 
+
+Library: a library that provides a unified interface for system calls and dynamic memory allocation/deallocation 
+routines. The library is pre-loaded into memory at the time of OS startup and is linked to the address space 
+of a process when an executable program is loaded into the memory for execution if required (as determined by 
+the Library flag in the executable file) . 
+
+Heap is the portion of the address space of a process reserved as the memory pool from which dynamic memory 
+allocation is done by the allocator routines in the shared library (for example, memory allocated via malloc in C). 
+Library functions access this portion of memory for dynamic memory allocation and deallocation. The eXpOS execution 
+semantics specify that when a process executes the Fork system call, this region will be shared between the parent 
+process and the child process.
+
+Code contains the header and code part of the XEXE executable file, which is loaded by the eXpOS loader from the file 
+system when the Exec system call is executed. The first eight words of the executable file contains the header. The 
+rest of the code region contains the XSM instructions. 
+
+Stack is the space reserved for the runtime stack of the process. Parameters and local variables associated with 
+functions in a program are allocated in the stack. In the XSM architecture, the stack grows upwards. Global variables 
+are normally allocated in the stack as the executable file format does not support a separate Data region. 
+
+XEXE format:
+An XEXE executable file in eXpOS consists of two parts:
+    1. Header
+    2. Code
+
+The first eight words of an executable file are reserved for the header which describes the features of file. 
+The structure of the header is :
+XMAGIC | ENTRY POINT | TEXT SIZE | DATA SIZE | HEAP SIZE | STACK SIZE | LIBRARY FLAG | UNUSED
+
+XMAGIC is a number indicating the type of executable file. All XEXE files will have magic number 0.
+Entry point contains the virtual address in memory of the first instruction to be executed (entry point) of 
+the program after the OS loader has loaded it. During loading, the program counter must be initialized to this 
+address.
+If the Runtime Library must be included when the file is loaded, the Library Flag is set to 1 in the executable 
+file. If this flag is not set then neither memory is allocated for the heap nor the library linked to the address 
+space of the process by the eXpOS loader at execution time.
+
+
+Low Level System Call Interface:
+The Low level system call interface describes the conventions to be followed by application programs that invoke 
+eXpOS system calls on the XSM architecture. The interface describes the software interrupt instruction (trap) 
+corresponding to each system call and the calling conventions for passing arguments and extracting return values 
+of the system call through the application program's stack. This part is architecture dependent.
+
+If a high level language like ExpL is used for writing application programs, then the application programs will 
+be using the high level library interface for invoking system calls. The ExpL compiler is responsible for 
+generating assembly language code to translate the call to a corresponding library call using the low level 
+library interface. The ExpL library which is pre-loaded into the system memory during eXpOS boot up contains 
+assembly language code that redirects the library call to the corresponding eXpOS system call using the low 
+level system call interface described here. If you write assembly language application programs as user 
+programs, then you can use the low level system call interface directly bye-passing the library.
+
+
+System Calls
+
+For an application program, there are two stages in executing a system call:
+
+    1. Before the system call : The calling application must set up the arguments in the (user) stack 
+       before executing the trap instruction. 
+    2. After the system call : The return value of the system call must be extracted from the stack.
+
+    so whaat happens is that the system call number , and the three arguments (fixed for myexpos ) and 
+    a spot for the return value is pushed to the stack. Now the INT is run. When this happens, ip+2 (next 
+    instruction after INT in the code) is pushed to stack . After this the interrupt routine is run according 
+    to the system call number. There is another number called the interrupt routine number which can be found 
+    using the system call number from low level system call interface . A routine might be handling multiple 
+    system calls. So after the routine is run, the IRET function is run where the IP is reassigned using the 
+    value from the stack and the arguments and system call number which was pushed earlier is also popped and 
+    discarded from the stack. This is done by the instructions in the compiled code from the expl.
+
+Low Level Runtime Library Interface:
+The library provides a uniform interface through which an application program can invoke system calls and 
+dynamic memory allocation / deallocation routines by providing the function code and the arguments. The 
+interface hides the details of the interrupt service routines corresponding to the system calls from the 
+application, thereby making them architecture independent. The library also provides user level routines 
+for dynamic memory management (allocation and de-allocation) from the heap region of the application.
+
+The library routine is linked to virtual address 0 of the address space of a process by the OS loader and 
+requires four arguments (function code and three arguments to the system call / memory management routine) 
+to be passed through the stack. The routine invokes the corresponding low level system call / memory 
+management routine and returns to the user program the return value of the system call / memory management 
+routine through the stack. The figure to the side shows the contents of the stack immediately before a call 
+to this library routine.
+
+So basically, the library routine would have high level library interface which uses function names and the 
+arguments. This in turn calls the system calls according to the high level library interface which then uses 
+the low level library interface for running the correct routine.This is the case for user routines (when we 
+use function codes).Here we do not use routine numbers and just use the function code along with the arguments 
+and use call 0  which connects to the logical address of the library. For using system call, you would have had 
+to use systemcall number , arguments and the interrupt routine number as well.
+
+  t = exposcall(fun_code, arg1, arg2, arg3);
+
+  the above is the syntax for the library function at the expl level.
+
+
+eXpOS pre-loads the library into the memory at boot time. The library re-directs system call requests to the 
+OS through the low level system call interface. Dynamic memory mangement functions are implemented as part of 
+the library itself.
+
+stage stuff:
+
+load --library ../expl/library.lib
+
+The above is to load the library to the disk before the OS startup. During the OS startup, the library is 
+loaded to memory.
