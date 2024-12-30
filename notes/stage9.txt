@@ -1,0 +1,201 @@
+Handling Kernel Stack:
+
+eXpOS requires that when the OS enters an interrupt handler that runs in kernel mode, the 
+interrupt handler must switch to a different stack. This requirement is to prevent user level 
+“hacks” into the kernel through the stack. In the previous stage, though you entered the timer 
+interrupt service routine in the kernel mode, you did not change the stack. In this stage, this 
+will be done.
+
+To isolate the kernel from the user stack, the OS kernel must maintain two stacks for a program 
+- a user stack and a kernel stack. In eXpOS, one page called the user area page is allocated for 
+each process. A part of the space in this page will be used for the kernel stack (some other process 
+information also will be stored in this page). 
+
+eXpOS requires you to maintain a Process Table, where data such as value of the kernel stack pointer, 
+user stack pointer etc. pertaining to each process is stored. 
+
+The process table starts at page number 56 (address 28672). The process table has space for 16 entries, 
+each having 16 words. Each entry holds information pertaining to one user process. Since we have only 
+one process, we will use the first entry (the first 16 words starting at address 28672). Among these, 
+we will be updating only entries for user stack pointer (word 13) and user area page number (word 11) 
+in this stage. 
+
+
+A hardware interrupt/exception can occur while an application program is executing. Since the application 
+does not have control over the transfer to the interrupt module, it would not have saved its context.
+
+Thus in this case the Interrupt Service Routine must save the register context of the application in the 
+kernel stack of the current process, perform the required operations and must restore the context before 
+returning to the application. The kernel stack is used to store the execution context of the user process. 
+(The backup and restore instructions of the XSM machine facilitate this).
+
+Actions done by the XSM machine on receiving an interrupt/ exception:-
+
+On Receiving an interrupt or exception, the XSM machine does 3 things:
+   
+    a. Pushes the return address (IP+2 value) to the user stack.
+    b. Switches mode of execution from user to kernel.
+    c. Transfers the control to the Interrut Service Routine or Exception Handler 
+
+
+The page number of the user area page is stored in the UArea Page Number field in the process table.
+The offset of SP register within the user area page will be stored (and not the physical address of the 
+kernel stack pointer) in the KPTR field of the process table . The purpose of storing the offset (instead 
+of the physical address) in the KPTR field is to allow the OS to relocate the user area page to another 
+physical memory page. On entering a kernel module from the user process, the kernel stack will be empty 
+and hence KTPR will be 0.
+When executing in user mode, the kernel stack is empty and hence the KPTR value is assumed to be zero.
+
+
+
+
+1. Actions done by the kernel upon entering the interrupt service routine
+    a. Switch from the user stack to the kernel stack. This involves storing the value of SP to UPTR field 
+       of the Process Table entry and setting the value of SP to User Area Page Number * 512 -1 as kernel stack 
+       is assumed to be empty on entering a kernel module from user process.
+    b. Save the values of the machine registers in the kernel stack using BACKUP machine instruction.
+    c. Continue execution of the interrupt routine code
+
+2. Actions done by the kernel before returning from the interrupt routine
+    a. Restore the values of the machine registers using RESTORE machine instruction
+    b. Set the value of SP to the top of the user stack
+    c. Transfer control back to the user process
+
+If an exception is caused by error conditions ( such as stack overflow, invalid stack pointer value, 
+arithmetic exceptions etc.), the user program will be terminated. However the procedure described above should be 
+followed while handling page fault exception (since this does not result in termination of the user program).
+
+
+Process Table (Process Control Block):
+The Process Table (PT) contains an entry for each process present in the system. The entry is created when the 
+process is created by a Fork system call. Each entry contains several fields that stores all the information 
+pertaining to a single process. The maximum number of entries in PT (which is maximum number of processes allowed 
+to exist at a single point of time in eXpOS) is MAX_PROC_NUM. In the current version of eXpOS, MAX_PROC_NUM = 16.
+Each entry in the Process Table has a constant size, defined by the PT_ENTRY_SIZE. In this version of eXpOS, 
+PT_ENTRY_SIZE is set to 16 words.
+
+
+Offset 	      0 	 1 	      2 	   3 	   4 	    6 	         7 	             8 	            9 	           10 	                    11 	                        12 	                            13               14 	 15
+Field Name 	TICK 	PID 	PPID 	USERID 	STATE 	SWAP FLAG 	INODE INDEX 	INPUT BUFFER 	MODE FLAG 	USER AREA SWAP STATUS 	USER AREA PAGE NUMBER 	KERNEL STACK POINTER (KPTR) 	USER STACK POINTER (UPTR) 	PTBR 	PTLR
+
+In this version of eXpOS, the Per-Process Resource Table is stored in the user area of each process. Generally, 
+the Per-Process Resource Table is stored somewhere in memory and a pointer to the table is kept in the Process 
+Table entry.
+
+PROCESS_TABLE + PID*16 gives the begining address of process table entry corresponding to the process with 
+identifier PID.
+
+
+
+PER-PROCESS DISK MAP TABLE
+The per-process Disk Map Table stores the disk block number corresponding to the pages of each process. The Disk 
+Map Table has 10 entries for a single process. When the memory pages of a process are swapped out into the disk,
+the corresponding disk block numbers of those pages are stored in this table. It also stores block numbers of the 
+code pages of the process. The Disk Map Table is present in page 58 of the memory, and the SPL constant 
+DISK_MAP_TABLE points to the starting address of the table. DISK_MAP_TABLE + PID*10 gives the begining address of 
+disk map table entry corresponding to the process with identifier PID.
+
+
+PER-PROCESS DISK MAP TABLE
+
+The per-process Disk Map Table stores the disk block number corresponding to the pages of each process. The Disk 
+Map Table has 10 entries for a single process. When the memory pages of a process are swapped out into the disk,
+the corresponding disk block numbers of those pages are stored in this table. It also stores block numbers of the 
+code pages of the process. The Disk Map Table is present in page 58 of the memory (see Memory Organisation), and 
+the SPL constant DISK_MAP_TABLE points to the starting address of the table. DISK_MAP_TABLE + PID*10 gives the 
+begining address of disk map table entry corresponding to the process with identifier PID.
+
+
+USER AREA
+
+Corresponding to each user process, the kernel maintains a seperate memory region (called the user area) for its 
+own purposes. The present version of eXpOS allocates one memory page per process as the user area. A part of this 
+space is used to store the per process resource table of the process. The rest of the memory is alloted for the 
+kernel stack of the process. Hence in eXpOS, each process has a kernel stack in addition to user stack. We maintain 
+a seperate stack for the kernel operations to prevent user-level "hacks" into kernel. 
+Basically, the KPTR (kernel stack pointer) contains the offset of SP register within the user area page. This along
+with the resource table is present in the user area page. We also store the page number of this user area in the 
+corresponding process table entry.
+
+
+PER-PROCESS RESOURCE TABLE
+
+The Per-Process Resource Table has 8 entries and each entry is of 2 words. The last 16 words of the User Area Page 
+are reserved for this. For every instance of a file opened (or a semaphore acquired) by the process, it stores the 
+index of the Open File Table (or Semaphore Table) entry for the file (or semaphore) is stored in this table. One 
+word is used to store the resource identifier which indicates whether the resource opened by the process is a FILE 
+or a SEMAPHORE. Open system call sets the values of entries in this table for a file.
+
+The per-process resource table entry has the following format.
+
+        |Resource Identifier (1 word)  |	Index of Open File Table/ Semaphore Table entry (1 word) |
+
+
+File descriptor, returned by Open system call, is the index of the per-process resource table entry for that open 
+instance of the file. (The file descriptor is an integer that uniquely identifies an open file of the process.)
+A free entry is denoted by -1 in the Resource Identifier field.
+
+PER-PROCESS KERNEL STACK
+
+Control is tranferred from a user program to a kernel module on the occurence of one of the following events :
+
+    The user program executes a system call
+    When an interrupt/exception occurs.
+
+In either case, the kernel allocates a separate stack for each process (called the kernel stack of the process) 
+which is different from the stack used by the process while executing in the user mode (called the user stack). 
+Kernel modules use the space in the kernel stack for storing local data and do not use the user stack. This is 
+to avoid user "hacks" into the kernel using the application's stack.
+
+In the case of a system call, the application will store the parameters for the system call in its user stack. 
+Upon entering the kernel module (system call), the kernel will extract these parameters from the application's 
+stack and then change the stack pointer to its own stack before further execution. Since the application invokes 
+the kernel module voluntarily, it is the responsibility of the application to save the contents of its registers 
+(except the stack pointer and base pointer registers in the case of the XSM machine) before invoking the system call.
+
+In the case of an interrupt/exception, the user process does not have control over the transfer to the kernel 
+module (interrupt/exception handler). Hence the execution context of the user process (that is, values of the 
+registers) must be saved by the kernel module, before the kernel module uses the machine registers for other 
+purposes, so that the machine state can be restored after completion of the interrupt/exception handler. The 
+kernel stack is used to store the execution context of the user process. This context is restored before the 
+return from the kernel module. (For the implementation of eXpOS on the XSM architecture, the backup and restore 
+instructions facilitate this).
+
+In addition to the above, if a kernel module invokes another kernel module while executing a system call/interrupt,
+the parameters to the called module and the return values from the module are passed through the same kernel stack.
+
+
+
+System Status Table
+
+It keeps the information about the number of free pages in memory, the number of processes blocked because memory is 
+unavailable, the number of processes in swapped state and, the pid of the process to be scheduled next. The size of 
+the table is 8 words out of which 2 words are unused.
+
+The System Status Table has the following format:
+CURRENT_USER_ID 	CURRENT_PID 	MEM_FREE_COUNT 	WAIT_MEM_COUNT 	SWAPPED_COUNT 	PAGING_STATUS 	CURRENT_PID2 	LOGOUT_STATUS
+
+    CURRENT_USER_ID (1 word) - specifies the userid of the currently logged in user.
+    CURRENT_PID (1 word) - specifies the pid of the currently running process.
+    MEM_FREE_COUNT (1 word) - specifies the number of free pages available in memory.
+    WAIT_MEM_COUNT (1 word) - specifies the number of processes waiting (blocked) for memory.
+    SWAPPED_COUNT (1 word) - specifies the number of processes which are swapped. A process is said to be swapped 
+                            if any of its user stack pages or its kernel stack page is swapped out.
+    PAGING_STATUS (1 word) - specifies whether swapping is initiated. Swap Out/Swap In are indicated by 0 and 1, 
+                            respectively. Set to 0 if paging is not in progress.
+    CURRENT_PID2 (1 word) - specifies the pid of the currently running process on the secondary core. This field 
+                            is used only when eXpOS is running on NEXSM (a two-core extension of XSM) machine.
+    LOGOUT_STATUS (1 word) - specifies whether logout is initiated on the primary core. Set to 0 if logout is not 
+                            initiated. This field is used only when eXpOS is running on NEXSM (a two-core extension 
+                            of XSM) machine.
+
+Initially, when the table is set up by the OS startup code, the MEM_FREE_COUNT is initialized to the number of 
+free pages available in the system, WAIT_MEM_COUNT to 0, SWAPPED_COUNT to 0 and PAGING_STATUS to 0.
+
+Note: The System Status Table is present in page 57 of the memory (see Memory Organisation), and the SPL constant 
+SYSTEM_STATUS_TABLE points to the starting address of the table.
+
+
+ print [SYSTEM_STATUS_TABLE + 1];
+
+ this can be used in the sample timer to print the current process id!
