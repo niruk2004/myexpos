@@ -1,0 +1,95 @@
+Console Output:
+
+Kernel Stack Management during System Calls:
+
+1. Actions done by the user process before executing an INT instruction
+    a. Push the registers in use to the stack
+    b. Push the system call number into the stack
+    c. Push the arguments
+    d. Push an empty space for the return value
+    e. Invoke the INT machine instruction corresponding to the system call
+
+
+2. Actions done by the System call service routine upon entry
+    a. Extract the system call number and the arguments from the user stack.
+    b. Set the MODE field in process table entry of the process to the system call number.
+    c. Switch from the user stack to the kernel stack.
+    d. Identify the system call using the system call number and transfer control to the system call code
+
+
+3. Actions done by the System call service routine before returning from the system call
+    a. Store the return value in the user stack
+    b. Set the stack pointer (SP) to top of the user stack
+    c. Set the MODE field in process table entry of the current process to 0.
+    d. Return to the user program using the IRET machine instruction
+
+
+4. Actions done by the process after returning from a system call
+    a. Save the return value
+    b. Pop off the arguments and the system call number from the stack
+    c. Restore the register context and resume execution.
+
+stage stuff:
+
+we are going to display into the console and  for that we have to use the INT 7 . Normally, the return 
+value of a system call gives information regarding whether the system call succeeded or whether there 
+was an error etc. In some cases, the system call returns a value which is to be used later in program 
+(for instance, the open system call returns a file descriptor). In the present case, since console 
+write never fails, we ignore the return value.
+
+
+
+0
+2056
+0
+0
+0
+0
+0
+0
+MOV R0, 1
+MOV R2, 5
+BRKP
+GE R2, R0
+JZ R2, 2112
+MOV R1, R0
+MUL R1, R0
+
+// saving register context
+PUSH R0
+PUSH R1
+PUSH R2
+
+// pushing system call number and arguments
+MOV R0, 5
+MOV R2, -2
+PUSH R0
+PUSH R2
+PUSH R1
+PUSH R0
+
+//  pushing space for return value
+PUSH R0
+INT 7
+
+// poping out return value and ignore
+POP R1
+
+// pop out argumnets and system call number and ignore
+POP R1
+POP R1
+POP R1
+POP R1
+
+//  restoring the register context
+POP R2
+POP R1
+POP R0
+
+ADD R0, 1
+JMP 2058
+
+INT 10
+
+
+This is the user program that we use
