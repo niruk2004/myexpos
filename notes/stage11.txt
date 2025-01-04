@@ -1,0 +1,274 @@
+Introduction to Expl:
+
+
+High Level Library Interface (API)
+
+The High Level Library Interface is a unified Application Programming Interface (API) to access 
+system call routines and dynamic memory management functions from application programs. The ExpL 
+language allows applications to access the OS routines only through the library interface. The 
+syntax for the call to the library function in ExpL is :
+
+            t = exposcall(fun_code, arg1, arg2, arg3);
+
+
+
+integer:
+    int a;
+
+string:
+    str b;
+
+user defined type:
+    mytype
+    {
+        int a;
+        str b;
+    }
+    mytype var1;
+    var1 = alloc();   /* Note:  Access without allocation can lead to run time errors */
+    var1.a = 10;     /*  the “.” symbol is used to access member fields */
+    retval = free(var1);
+
+array:
+    int a[10];            /* array a indexed a[0],a[1],..a[9], can store 10 integers*/
+    str stringlist[10];   /* stringlist is an array of 10 strings */
+
+
+
+An ExpL program consists of the following sections:
+
+    1)Type Definitions - Optional (for user defined types)
+    2)Global Declarations - for global variables, arrays and functions
+    3)Function Definitions and the main Function Definition
+
+1) All user-defined types in a program must be defined in the type definition section. The Type 
+Definition section starts with the keyword type and ends with the keyword endtype.
+    Example
+        type
+        linkedlist{
+        int data;
+        linkedlist next;
+        }
+        marklist{
+        str name;
+        linkedlist marks;
+        }
+        endtype
+        //...Global Declarations..
+	    //...Functions....
+
+2)The global declaration part of an ExpL program begins with the keyword decl and ends with the 
+keyword enddecl. All global variables, arrays and functions in a program must be declared in 
+this section. Array type variables can be declared only globally. Only single dimensional arrays 
+are allowed. Variables cannot be assigned values during the declaration phase.  For every function 
+except the special main function defined in an ExpL program, there must be a declaration. A function 
+declaration should specify the name of the function, the name and type of each of its arguments and 
+the return type of the function. A function can have integer/string/user defined type arguments. The 
+return type of a function also can be integer/string/user-defined type. ExpL enforces call-by-value 
+semantics for integer and string parameters and call-by-reference for user-defined types. (A variable 
+of a user defined type typically stores a reference to its store.) Arrays cannot be passed as arguments. 
+If a global variable name appears as an argument of a function, then within the scope of the function, 
+the new declaration will be valid and the global declaration is suppressed. Different functions may 
+have arguments of the same name. However, the same name cannot be given to two or more arguments in 
+a function. The general form of declarations is as follows:
+
+        type VarName1, VarName2 ;    /* variable declarations */
+        rettype FunctionName (ParameterList);    /*  A function declaration */
+        type VarName[ArraySize];    /* An array declaration */
+                        
+
+Note : Declarations for variables/functions of the same type can be combined as shown in the following example.
+
+Example :
+
+        decl   /* Please note the use of "," and ";" */
+            int x,y,a[10],b[20];       /* x,y are integers, a,b are integer arrays */
+            str t, q[10], f3(str x);   /*variable, array and a functions declared together*/
+            mytype m, fun(mytype t);   /* myptype must be  a user defined type */
+            /*  The argument and the return value of fun are references to mytype */
+        enddecl
+                        
+
+Declaring functions at the beginning avoids the forward reference problem and facilitates single pass compilation. 
+If a variable/function is declared multiple times, a compilation error should result. 
+
+
+Function Definitions and the Main Function:
+
+All globally declared variables are visible inside a function, unless suppressed by a re-declaration within the 
+function. Variables declared inside a function are invisible outside. The general form of a function definition 
+is given below:
+
+        < Type > FunctionName(ArgumentList)
+        {
+            Local Declarations
+            Function Body
+        }
+                        
+ The names and types of the arguments and return value of each function definition should match exactly (name 
+ equivalence) with the corresponding declaration. Every declared function must have exactly one definition. 
+ The compiler should report error otherwise.
+
+The syntax of local declarations and definitions are similar to those of global declarations except that arrays 
+and functions cannot be declared inside a function. Local variables are visible only within the scope of the 
+function where they are declared. The scope of a parameter is limited to the function. Static scope rules apply. 
+A function can have a user defined type as its return type. Similarly, parameters to a function can be of user 
+defined types.
+
+The main() function, by specification, must be a zero argument function of return type integer. It must be 
+defined immediately after declaration section, before all other functions are defined. Program execution begins 
+from the body of the main function. The main function must not be declared. The definition part of main should 
+be given in the same format as any other function.
+
+The Body of a function is a collection of statements embedded within the keywords begin and end.
+
+Example : The following is an example for a simple function definition.
+
+        int fun(int a,int b)
+        {
+            decl
+            int c,d;
+            enddecl
+            begin
+            c = a + b;
+            d = a - b;
+            write(c);
+            write(d);
+            return c;
+            end
+        }
+                        
+
+Local Variables and parameters should be allocated space in the run-time stack of the function. The language 
+supports recursion.
+
+Each statement should end with a ‘;’ which is called the statement terminator.
+
+There are seven types of statements in ExpL. They are:
+
+    Assignment Statement
+        In an assignment x=y where x and y are of a primitive type (integer or string), the value inside the 
+        location indicated by y is copied into the location indicated by x. On the other hand, if x and y are 
+        variables of a user defined type, the assignment only makes both x and y refer to the same memory object. 
+        This is because a variable of a user defined type stores a reference to its store allocated using alloc(). 
+
+    Conditional Statement
+
+    Iterative statement
+
+    Return statement
+        return < Expression* > ; /* The type of the expression should match with the return type of the function*/
+        Note* : As an exception to the rule above, the expression returned by a function whose return type is a 
+        user defined type can be the constant NULL.The return type of main is integer by specification.
+
+    Input/Output statements
+
+    Break statement
+
+    Continue statement
+
+
+
+Dynamic memory allocation
+
+The library functions initialize(), alloc() and free() are used as follows:
+
+    intialize(); /* To Intialise the heap. */
+    t = alloc(); /* Allocates contiguous locations in the heap, t must be a user defined variable */
+    retval = free(t);  /* Free the allocated block , t must be a user defined variable */
+                        
+
+Intialize() must be invoked before any allocation is made and it resets the heap to default values. A call to 
+alloc() allocates contiguous memory locations in the heap memory (memory reserved for dynamic memory allocation) 
+and returns the address of the starting location. The Expl compiler sets the variable (of a user defined type) 
+on the left of the assignment to store this memory address. A call to free() deallocates contiguous memory 
+locations in the heap memory that is referenced by the user defined type variable. The function free() returns 
+NULL on successful deallocation. Otherwise, the value of t is unchanged by a call to free(). All unallocated 
+user defined variables are set to the predefined constant NULL.
+
+
+
+Parameter passing
+
+Functions can take any number of arguments and must return a single value. The arguments and return values may 
+be of integer, string or user defined types.
+
+Arguments to functions are passed by value. This means that changes to made to the values of an argument inside 
+a function will not be visible outside the function.
+
+However, if a variable is of a user defined type, after allocation using the Alloc() function, the variable 
+stores the memory address of the actual data in heap memory where the data associated with the variable is 
+stored. ExpL specification allows the data to be modified using the variable. If the data stored variable is 
+changed with in a function, the change will be visible globally. This is because heap memory is globally visible.
+
+The scope rules are illustrated by the following example.
+	type
+	node {
+	int x;
+	}
+	endtype
+	decl
+	node fun(node t);
+	enddecl
+	node fun(node t) { // t and r points to the same heap memory location.
+	begin
+	t.x=3; // modifies heap, change is visible in main.
+	t = null; // r does not become NULL in main() by this assignment
+	return t;
+	end
+	}
+	int main()
+	{
+	decl
+	int val;
+	node r, s;
+	enddecl
+	begin
+	val = initialize();
+	r = alloc(); // r stores address of a node in the heap memory
+	r.x = 5;
+	s = fun(r);
+	write(r.x); // Now 3 will be output.
+	return 0;
+	end
+	}
+
+
+
+Appendix
+Keywords
+
+The following are the reserved keywords in ExpL and it cannot be used as identifiers.
+read 	write 	if 	then 	else 	begin 	initialize
+endif 	do 	endwhile 	break 	while 	end
+int 	str 	return 	decl 	enddecl 	alloc
+type 	endtype 	NULL 	continue 	main 	free
+
+Operators and Delimiters
+
+The following are the operators and delimiters in ExpL
+> 	< 	>= 	<= 	!= 	== 	( 	)
+{ 	} 	[ 	] 	/ 	; 	* 	=
++ 	- 	% 	AND 	NOT 	OR 	.
+
+Identifiers
+
+Identifiers are names of variables and user-defined functions. Identifiers should start with
+an letter, and may contain both letters and digits. Special characters are not allowed in 
+identifiers.
+
+letter -> [a-z]|[A-Z]
+
+digit -> [0-9]
+
+identifier -> (letter)(letter | digit)*
+
+
+
+stage stuff:
+The present version of ExpL compiles <filename>.expl into <filename>.xsm. A copy of this target file 
+is also wriiten into the file assemblycode.xsm for backward compatibility.
+
+
+Basically in this stage , you learn to code in EXPL and run it on the xsm. You also try out to make your 
+own library which (on this stage) is calling INT 7 (since that is the only interrupt you have currently implemented)
