@@ -5,3 +5,7 @@ load --exhandler $HOME/myexpos/spl/spl_progs/haltprog.xsm
 load --int=timer $HOME/myexpos/spl/spl_progs/sample_timer.xsm
 load --int=7 $HOME/myexpos/spl/spl_progs/sample_int7.xsm
 load --init $HOME/myexpos/expl/expl_progs/stage10_write.xsm
+
+ load --library $HOME/myexpos/expl/expl_progs/stage11_lib.lib
+
+load --idle $HOME/myexpos/expl/expl_progs/idle_process.xsm
