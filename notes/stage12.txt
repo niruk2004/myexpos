@@ -15,3 +15,121 @@ Before OS bootstrap, it must be stored in the disk blocks 11 and 12. The OS boot
 this program to memory pages 69 and 70.. The Page Table and Process Table for the idle process must be set 
 up by the bootstrap loader. The PID of the idle process is fixed to be 0.
 
+assignment q2: result
+
+niranjan@niranjan-Victus:~/myexpos/xsm$ ./xsm --debug
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p 0 
+Tick:            
+PID:            0 
+PPID:            
+UserID:                  
+State:          (CREATED, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          82 
+Kernel Stack Pointer:           0 
+User Stack Pointer:             4096 
+PTBR:           29696 
+PTLR:           10 
+debug> p 1
+Tick:            
+PID:            1 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          80 
+Kernel Stack Pointer:           0 
+User Stack Pointer:             4096 
+PTBR:           29716 
+PTLR:           10 
+debug> pt 0
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: -1         AUX: 0000
+VIRT: 3         PHY: -1         AUX: 0000
+VIRT: 4         PHY: 69         AUX: 0100
+VIRT: 5         PHY: 70         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 81         AUX: 0110
+VIRT: 9         PHY: -1         AUX: 0000
+debug> pt 1
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 78         AUX: 0110
+VIRT: 3         PHY: 79         AUX: 0110
+VIRT: 4         PHY: 65         AUX: 0100
+VIRT: 5         PHY: 66         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 76         AUX: 0110
+VIRT: 9         PHY: 77         AUX: 0110
+debug> c
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 0
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p 0
+Tick:            
+PID:            0 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          82 
+Kernel Stack Pointer:           0 
+User Stack Pointer:             4096 
+PTBR:           29696 
+PTLR:           10 
+debug> p 1
+Tick:            
+PID:            1 
+PPID:            
+UserID:                  
+State:          (READY, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          80 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4101 
+PTBR:           29716 
+PTLR:           10 
+debug> pt 0
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: -1         AUX: 0000
+VIRT: 3         PHY: -1         AUX: 0000
+VIRT: 4         PHY: 69         AUX: 0100
+VIRT: 5         PHY: 70         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 81         AUX: 0110
+VIRT: 9         PHY: -1         AUX: 0000
+debug> pt 1
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 78         AUX: 0110
+VIRT: 3         PHY: 79         AUX: 0110
+VIRT: 4         PHY: 65         AUX: 0100
+VIRT: 5         PHY: 66         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 76         AUX: 0110
+VIRT: 9         PHY: 77         AUX: 0110
