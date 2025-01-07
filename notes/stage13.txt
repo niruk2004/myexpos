@@ -1,0 +1,364 @@
+Boot Module:
+
+Modules in eXpOS are used to perform certain logical tasks, which are performed frequently. eXpOS modules 
+serve various purposes like scheduling new process, acquiring and releasing resources etc. These modules 
+run in kernel mode and are invoked only from the kernel mode. A user program can never invoke a module 
+directly. Modules can be invoked from interrupt routines, other modules or the OS startup code.
+
+As modules execute in kernel mode, the kernel stack of the currently scheduled process is used as the 
+caller-stack for module invocation. XSM supports eight modules - MOD_0 to MOD_7 - which can be invoked 
+using the CALL MOD_n / CALL <MODULE_NAME> instruction .
+
+
+According to the memory organization of eXpOS, the OS startup code is provided with only one memory page 
+(page numer 1). However, the code for OS startup may exceed one page due to initialization of several OS 
+data structures. So we design a module for the purpose of OS initialization. This module will be called 
+the Boot module (module 7). The Boot module is invoked from the OS startup code. The OS startup code 
+hand-creates the idle process, initializes the SP register to the kernel stack of the idle process, loads 
+module 7 in memory and then invokes the boot module (using the stack of the IDLE process). Upon return 
+from the boot module, the OS startup code initiates user mode execution of the idle process. Note that 
+in the previous stage, we had scheduled the INIT process first, before executing the IDLE pocess. Starting 
+from the present stage, the idle process will be scheduled first.
+
+The idle process is run first to ensure that this process is scheduled at least once, so that its context 
+gets initialized. This useful because in later stages, certain kernel operations (like disk swap) are 
+performed from the context of the IDLE process. 
+
+
+So in the os startup code, we loaded the bootmodule and idle process and assigned 81*512 -1 to SP ( 82 is 
+the user area page of idle process). This is done before calling the bootmodule as it is a kernel program 
+and we need a stack before calling the bootmodule. After that we call the bootmodule. In the bootmodule , 
+we load all the interrupts , library, handlers etc. We set up the init program inside the 
+bootmodule -  its page table and process table entries inside the bootmodule. Earlier we were running 
+init program first and hence it's status in process table was RUNNING but now we run the idle process 
+first and hence make the status of init program as CREATED. After this it is returned to os startup. In 
+the startup, the page table and process table entries of idle is setup (The status of idle process is 
+RUNNING) and the system status table's current pid is set to 0 instead of 1 (unlike the previous stage). 
+Then it is returned using ireturn.
+
+When we try to run using without timer, it wont show any output as the process is not switching from idle 
+process when timer is not there.
+
+
+
+for assignment q2,
+
+
+niranjan@niranjan-Victus:~/myexpos/xsm$ ./xsm --debug
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 0
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p
+Tick:            
+PID:            0 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          82 
+Kernel Stack Pointer:           0 
+User Stack Pointer:             4096 
+PTBR:           29696 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: -1         AUX: 0000
+VIRT: 1         PHY: -1         AUX: 0000
+VIRT: 2         PHY: -1         AUX: 0000
+VIRT: 3         PHY: -1         AUX: 0000
+VIRT: 4         PHY: 69         AUX: 0100
+VIRT: 5         PHY: 70         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 81         AUX: 0110
+VIRT: 9         PHY: -1         AUX: 0000
+debug> c
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p
+Tick:            
+PID:            1 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          80 
+Kernel Stack Pointer:           0 
+User Stack Pointer:             4096 
+PTBR:           29716 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 78         AUX: 0110
+VIRT: 3         PHY: 79         AUX: 0110
+VIRT: 4         PHY: 65         AUX: 0100
+VIRT: 5         PHY: 66         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 76         AUX: 0110
+VIRT: 9         PHY: 77         AUX: 0110
+debug> c
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 2
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p
+Tick:            
+PID:            2 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          88 
+Kernel Stack Pointer:           0 
+User Stack Pointer:             4096 
+PTBR:           29736 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 86         AUX: 0110
+VIRT: 3         PHY: 87         AUX: 0110
+VIRT: 4         PHY: 83         AUX: 0100
+VIRT: 5         PHY: -1         AUX: 0000
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 84         AUX: 0110
+VIRT: 9         PHY: 85         AUX: 0110
+debug> c
+TIMER
+Previous instruction at IP = 2278: BRKP
+Mode: KERNEL     PID: 0
+Next instruction at IP = 2280, Page No. = 4: IRET
+debug> p
+Tick:            
+PID:            0 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          82 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4100 
+PTBR:           29696 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: -1         AUX: 0000
+VIRT: 1         PHY: -1         AUX: 0000
+VIRT: 2         PHY: -1         AUX: 0000
+VIRT: 3         PHY: -1         AUX: 0000
+VIRT: 4         PHY: 69         AUX: 0100
+VIRT: 5         PHY: 70         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 81         AUX: 0110
+VIRT: 9         PHY: -1         AUX: 0000
+debug> c
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 0
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p
+Tick:            
+PID:            0 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          82 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4100 
+PTBR:           29696 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: -1         AUX: 0000
+VIRT: 1         PHY: -1         AUX: 0000
+VIRT: 2         PHY: -1         AUX: 0000
+VIRT: 3         PHY: -1         AUX: 0000
+VIRT: 4         PHY: 69         AUX: 0100
+VIRT: 5         PHY: 70         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 81         AUX: 0110
+VIRT: 9         PHY: -1         AUX: 0000
+debug> c
+TIMER
+Previous instruction at IP = 2278: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 2280, Page No. = 4: IRET
+debug> p
+Tick:            
+PID:            1 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          80 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4101 
+PTBR:           29716 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 78         AUX: 0110
+VIRT: 3         PHY: 79         AUX: 0110
+VIRT: 4         PHY: 65         AUX: 0100
+VIRT: 5         PHY: 66         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 76         AUX: 0110
+VIRT: 9         PHY: 77         AUX: 0110
+debug> c
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p
+Tick:            
+PID:            1 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          80 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4101 
+PTBR:           29716 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 78         AUX: 0110
+VIRT: 3         PHY: 79         AUX: 0110
+VIRT: 4         PHY: 65         AUX: 0100
+VIRT: 5         PHY: 66         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 76         AUX: 0110
+VIRT: 9         PHY: 77         AUX: 0110
+debug> c
+TIMER
+Previous instruction at IP = 2278: BRKP
+Mode: KERNEL     PID: 2
+Next instruction at IP = 2280, Page No. = 4: IRET
+debug> p
+Tick:            
+PID:            2 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          88 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4101 
+PTBR:           29736 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 86         AUX: 0110
+VIRT: 3         PHY: 87         AUX: 0110
+VIRT: 4         PHY: 83         AUX: 0100
+VIRT: 5         PHY: -1         AUX: 0000
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 84         AUX: 0110
+VIRT: 9         PHY: 85         AUX: 0110
+debug> c
+Previous instruction at IP = 2048: BRKP
+Mode: KERNEL     PID: 2
+Next instruction at IP = 2050, Page No. = 4: MOV R16,28672
+debug> p
+Tick:            
+PID:            2 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          88 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4101 
+PTBR:           29736 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: 63         AUX: 0100
+VIRT: 1         PHY: 64         AUX: 0100
+VIRT: 2         PHY: 86         AUX: 0110
+VIRT: 3         PHY: 87         AUX: 0110
+VIRT: 4         PHY: 83         AUX: 0100
+VIRT: 5         PHY: -1         AUX: 0000
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 84         AUX: 0110
+VIRT: 9         PHY: 85         AUX: 0110
+debug> c
+TIMER
+Previous instruction at IP = 2278: BRKP
+Mode: KERNEL     PID: 0
+Next instruction at IP = 2280, Page No. = 4: IRET
+debug> p
+Tick:            
+PID:            0 
+PPID:            
+UserID:                  
+State:          (RUNNING, )
+Swap Flag:               
+Inode Index:             
+Input Buffer:            
+Mode Flag: 
+User Area Swap Status:           
+User Area Page Number:          82 
+Kernel Stack Pointer:           20 
+User Stack Pointer:             4100 
+PTBR:           29696 
+PTLR:           10 
+debug> pt
+VIRT: 0         PHY: -1         AUX: 0000
+VIRT: 1         PHY: -1         AUX: 0000
+VIRT: 2         PHY: -1         AUX: 0000
+VIRT: 3         PHY: -1         AUX: 0000
+VIRT: 4         PHY: 69         AUX: 0100
+VIRT: 5         PHY: 70         AUX: 0100
+VIRT: 6         PHY: -1         AUX: 0000
+VIRT: 7         PHY: -1         AUX: 0000
+VIRT: 8         PHY: 81         AUX: 0110
+VIRT: 9         PHY: -1         AUX: 0000
+debug> 
+
+
+
