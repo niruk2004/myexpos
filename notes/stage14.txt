@@ -1,0 +1,55 @@
+Round Robin Scheduler:
+
+When the timer ISR calls the scheduler, the active kernel stack will be that of the currently 
+RUNNING process. The scheduler assumes that the timer handler would have saved the user context 
+of the current process (values of R0-R19 and BP registers) into the kernel stack before the call. 
+It also assumes that the state of the process has been changed to READY. However, the machine's 
+SP register will still point to the top of the kernel stack of the currently running process at 
+the time of the call. 
+
+
+The scheduler first saves the values of the registers SP, PTBR and PTLR to the process table 
+entry of the current process.Next, it must decide which process to run next. This is done using 
+the Round Robin Scheduling algorithm. Having decided on the new process, the scheduler loads new 
+values into SP, PTBR and PTLR registers from the process table entry of the new process. It also 
+updates the system status table to store PID of new process. If the state of the new process is 
+READY, then the scheduler changes the state to RUNNING. Now, the scheduler returns using the 
+return instruction. 
+
+
+There are two situations that can result in a context switch:
+
+1. The time slice of a process executing in the user mode expires and a timer interrupt is raised. 
+The timer interrupt routine invokes the scheduler module(MOD_5) to perform a context switch.
+
+2. While executing in the kernel mode (inside a system call or the exception handler), a process 
+has to wait for some event to happen (ex: wait for a resource like disk, terminal etc) and hence 
+voluntarily invokes the scheduler(MOD_5) to schedule itself out. 
+
+
+
+ In the present stage, the scheduler module is called only from the time interrupt handler. The 
+ timer interrupt handler already contains the instruction to backup the register context of the 
+ current process. Hence, the scheduler does not have to worry about having to save the user register 
+ context (including the value of the BP register) of the current process. What then is the need for 
+ the scheduler to push the BP register?
+
+The reason is that, in later stages, the scheduler may be called from kernel modules other than the 
+timer interrupt routine. Such calls typically happen when an application invokes a system call and 
+the system call routine invokes a kernel module which in turn invokes the scheduler. Whenever this 
+is the case, the OS kernel expects that the application saves all the user mode registers except the 
+BP register before making the system call.
+
+For instance, if the application is written in ExpL and compiled using the ExpL compiler given to you, 
+the compiler saves all the user registers except BP before making the system call. The ExpL compiler 
+expects that the OS will save the value of the BP register before scheduling another application 
+process. This explains why the scheduler needs to save the BP register before a context switch. 
+
+
+The ExpL compiler sets every user program to execute the INT 10 instruction (exit system call) at the 
+end of execution to terminate the process gracefully. In previous stages, we wrote an INT 10 routine 
+containing just a halt instruction. Hence, if any process invoked INT 10 upon exit, the machine would 
+halt and no other process would execute further. However, to allow multiple processes to run till 
+completion, INT 10 must terminate only the process which invoked it, and schedule other surviving 
+processes. (INT 10 shall set the state of the dying process to TERMINATED). If all processes except 
+idle are in TERMINATED state, then INT 10 routine can halt the system. 
