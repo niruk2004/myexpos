@@ -1,0 +1,106 @@
+Resource Manager Module:
+
+Processes in eXpOS require various resources like terminal, disk, inode etc. To manage these resources 
+among different processes eXpOS implements a resource manager module (Module 0). Before the use of a 
+resource, a process has to first acquire the required resource by invoking the resource manager. A 
+process can acquire a resource if the resource is not already acquired by some other process. If the 
+resource requested by a process is not available, then that process has to be blocked until the resource 
+becomes free. In the meanwhile, other processes may be scheduled. 
+
+
+The OS maintains a data structure called the Terminal Status Table. The Terminal Status table contains 
+details of the process that has acquired the terminal. (Since there is only one terminal in the system, 
+only one process is allowed to acquire the terminal at a time.) A flag named STATUS in the terminal status 
+table indicates whether the terminal is available or not. When a process acquires the terminal, the PID of 
+the process is updated in the terminal status table. 
+
+There are two functions related to terminal management in module 0. These are the Acquire Terminal and the 
+Release Terminal functions. Each function has a function number to identify the function within the module. 
+In the Resource Manager module, Acquire Terminal and Release Terminal have function numbers 8 and 9 respectively. 
+When a module function is invoked, the function number (identifying the particular function within the module) 
+is stored in register R1 and passed as argument to the module. The other arguments are passed through registers 
+R2, R3 etc. For both Acquire Terminal and Release Terminal, PID of the currently running process needs to be 
+passed as an argument through the register R2. 
+
+In the case of calling modules in spl, since the caller and the callee are both executing in protected mode, 
+the same stack can be used. Here, the recommended parameter passing convention is to use R1, R2... for argument_1, 
+argument_2, argument_3... The return value of the module may be stored in R0. This convention is recommended 
+instead of using the stack for passing arguments for improving efficiency. 
+
+Terminal Status Table
+
+The Terminal Status Table keeps track of the Read/Write operations done on the terminal. Every time a Read or 
+Write system call is invoked on the terminal, the PID of the process that invoked the system call is stored in 
+Terminal Status Table. The table also contains information on the status of the terminal (whether free or busy). 
+The size of the table is 4 words of which the last 2 are unused.
+
+Every entry of the Terminal Status Table has the following format:
+STATUS 	PID 	Unused
+
+
+
+The Acquire Terminal function described above waits in a loop, in which it repeatedly invokes the scheduler if the 
+terminal is not free. This kind of a waiting loop is called a busy loop or busy wait.
+
+
+We call terminal write (MODULE 4 ) in int 7 after pushing all the registers which was used in int 7 to the stack and 
+then changing the arguments accordingly in the registers and calling the module 4. We ignore the return value of the 
+terminal write as it does not return anything (it was supposedly to come in R0).After this, we multipop all the pushed 
+registers to get back the earlier context.
+
+
+
+q2:
+niranjan@niranjan-Victus:~/myexpos/xsm$ ./xsm --debug
+Previous instruction at IP = 24592: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 24594, Page No. = 48: CALL 20480
+debug> tst
+Status: 0       PID: 
+debug> c
+1
+Previous instruction at IP = 24618: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 24620, Page No. = 48: CALL 20480
+debug> tst
+Status: 1       PID: 1
+debug> c
+Previous instruction at IP = 24592: BRKP
+Mode: KERNEL     PID: 2
+Next instruction at IP = 24594, Page No. = 48: CALL 20480
+debug> tst
+Status: 0       PID: 1
+debug> c
+2
+Previous instruction at IP = 24618: BRKP
+Mode: KERNEL     PID: 2
+Next instruction at IP = 24620, Page No. = 48: CALL 20480
+debug> tst
+Status: 1       PID: 2
+debug> c
+Previous instruction at IP = 24592: BRKP
+Mode: KERNEL     PID: 3
+Next instruction at IP = 24594, Page No. = 48: CALL 20480
+debug> tst
+Status: 0       PID: 2
+debug> c
+2
+Previous instruction at IP = 24618: BRKP
+Mode: KERNEL     PID: 3
+Next instruction at IP = 24620, Page No. = 48: CALL 20480
+debug> tst
+Status: 1       PID: 3
+debug> c
+Previous instruction at IP = 24592: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 24594, Page No. = 48: CALL 20480
+debug> tst
+Status: 0       PID: 3
+debug> c
+3
+Previous instruction at IP = 24618: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 24620, Page No. = 48: CALL 20480
+debug> tst
+Status: 1       PID: 1
+debug> 
