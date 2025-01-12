@@ -1,0 +1,75 @@
+//mod_7 boot module
+loadi(54,67);
+loadi(55,68);
+
+//idle
+loadi(69,11);
+loadi(70,12);
+
+SP = (82 * 512 )- 1;
+
+call BOOT_MODULE;
+
+
+//idle_page_table
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
+
+//Library
+[PTBR+0] = -1;
+[PTBR+1] = "0000";
+[PTBR+2] = -1;
+[PTBR+3] = "0000";
+
+//Heap
+[PTBR+4] = -1;
+[PTBR+5] = "0000";
+[PTBR+6] = -1;
+[PTBR+7] = "0000";
+
+//Code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+[PTBR+10] = 70;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 81;
+[PTBR+17] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
+
+
+
+//pid_for_idle_is_0
+[PROCESS_TABLE+1]=0;
+
+//status_of_idle_is_created
+[PROCESS_TABLE+4]=RUNNING;
+
+//user_AreA_page_for_idle_is82
+[PROCESS_TABLE+11]=82;  
+
+//KPTR_for_idle
+[PROCESS_TABLE +  12] = 0;
+
+//UPTR_for_idle
+[PROCESS_TABLE + 13] = 8*512;
+
+//PTBR_for_idle
+[PROCESS_TABLE + 14] = PAGE_TABLE_BASE;
+
+//PTLR_for_idle
+[PROCESS_TABLE + 15] = 10;
+
+//current_process_pid
+[SYSTEM_STATUS_TABLE + 1] = 0;
+
+[81 * 512] = [69*512 + 1];
+SP = 8*512;
+
+ireturn;

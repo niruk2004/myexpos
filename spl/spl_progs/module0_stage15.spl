@@ -1,0 +1,48 @@
+alias functionNum R1; 
+alias currentPID R2; 
+
+//acquire terminal
+if(functionNum==8) then 
+	
+	while( ([TERMINAL_STATUS_TABLE] ) == 1) do
+
+		[ (PROCESS_TABLE + (currentPID * 16)) + 4 ] = WAIT_TERMINAL;
+		multipush(R1, R2);
+		call MOD_5;
+		multipop(R1, R2);
+
+	endwhile;
+
+	[TERMINAL_STATUS_TABLE] = 1;
+	[TERMINAL_STATUS_TABLE + 1] = currentPID;
+	return;
+
+endif;
+
+//release terminal
+if(functionNum==9) then
+
+	if([TERMINAL_STATUS_TABLE + 1] == currentPID) then
+
+		[TERMINAL_STATUS_TABLE] = 0;
+
+        //waking up all the processes which are in WAIT_TERMINAL state
+		alias i R6;
+		i=0;
+		while(i<=15) do
+			if([PROCESS_TABLE+16*i+4] == WAIT_TERMINAL) then
+				[PROCESS_TABLE+16*i+4]=READY;
+			endif;
+			i=i+1;
+		endwhile;
+
+		R0=0;
+		return;
+
+	else
+        //we tried to release terminal when it was not even acquired by the current process in the first place
+		R0=-1;
+		return;
+
+	endif;
+endif;

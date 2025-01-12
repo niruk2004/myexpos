@@ -1,0 +1,44 @@
+decl
+    int arr[50];
+enddecl
+int main()
+{
+decl 
+   int temp,i,j,dup,n; 
+enddecl
+
+begin
+  temp = exposcall("Write",-2,"enter n");
+  temp = exposcall("Read",-1,n);
+
+  i=0;
+  while(i<n) do
+    temp = exposcall("Write",-2,"enter val");
+    temp = exposcall("Read",-1,arr[i]);
+    i = i+1;
+  endwhile;
+
+  i=0;
+  while(i<n) do
+    j=i;
+    while(j<n) do
+      if(arr[i]>arr[j]) then
+        dup = arr[i];
+        arr[i] = arr[j];
+        arr[j] = dup;
+      endif;
+      j = j + 1;
+    endwhile;
+    i = i+1;
+  endwhile;
+
+  temp = exposcall("Write",-2,"sorted ans:");
+  i=0;
+  while(i<n) do
+    temp = exposcall("Write",-2, arr[i]);
+    i = i+1;
+  endwhile;
+
+return 0;
+end
+}

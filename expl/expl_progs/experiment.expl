@@ -1,0 +1,30 @@
+ 	type
+	node {
+	int x;
+	}
+	endtype
+	decl
+	node fun(node t);
+	enddecl
+	node fun(node t) { // t and r points to the same heap memory location.
+	begin
+	t.x=3; // modifies heap, change is visible in main.
+	t = null; // r does not become NULL in main() by this assignment
+	return t;
+	end
+	}
+	int main()
+	{
+	decl
+	int val;
+	node r, s;
+	enddecl
+	begin
+	val = initialize();
+	r = alloc(); // r stores address of a node in the heap memory
+	r.x = 5;
+	s = fun(r);
+	write(r.x); // Now 3 will be output.
+	return 0;
+	end
+	}

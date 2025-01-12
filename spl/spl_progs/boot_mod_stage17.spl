@@ -1,0 +1,164 @@
+//exception
+loadi(2, 15);
+loadi(3, 16);
+
+//timer
+loadi(4, 17);
+loadi(5, 18);
+
+//console interrupt
+loadi(8,21);
+loadi(9,22);
+
+//int6
+loadi(14,27);
+loadi(15,28);
+
+//int7
+loadi(16,29);
+loadi(17,30);
+
+//int 9
+loadi(20,33);
+loadi(21,34);
+
+//int10
+loadi(22,35);
+loadi(23,36);
+
+//module_0 device manager 
+loadi(40,53);
+loadi(41,54);
+
+//module 1 process manager
+loadi(42,55);
+loadi(43,56);
+
+//module 2 memory manager
+loadi(44,57);
+loadi(45,58);
+
+//module_4 resource handler
+loadi(48,61);
+loadi(49,62);
+
+//module_5 Scheduler
+loadi(50,63);
+loadi(51,64);
+
+//Inode Table
+loadi(59,3);
+loadi(60,4);
+
+//library
+loadi(63,13);
+loadi(64,14);
+
+//init
+loadi(65,7);
+loadi(66,8);
+
+//initializing terminal status as free
+[TERMINAL_STATUS_TABLE] = 0;
+
+//Setting memory free list
+alias i R0;
+i=0;
+while(i<=82) do
+	[MEMORY_FREE_LIST+i]=1;
+	i=i+1;
+endwhile;
+i=81;
+while(i<=127) do
+	[MEMORY_FREE_LIST+i]=0;
+	i=i+1;
+endwhile;
+
+//initializing WAIT_MEM_COUNT to 0
+[SYSTEM_STATUS_TABLE+3]=0;
+
+//initializing MEM_FREE_COUNT to 45 (127-82) 
+[SYSTEM_STATUS_TABLE+2]=45;
+
+
+//init_page_Table
+
+//changing_the_PTBR_value_for_init_PTLR_remains_the_same
+PTBR = PAGE_TABLE_BASE + 20;
+PTLR = 10;
+
+//Library
+[PTBR+0] = 63;
+[PTBR+1] = "0100";
+[PTBR+2] = 64;
+[PTBR+3] = "0100";
+
+//Heap
+[PTBR+4] = 78;
+[PTBR+5] = "0110";
+[PTBR+6] = 79;
+[PTBR+7] = "0110";
+
+//Code
+[PTBR+8] = 65;
+[PTBR+9] = "0100";
+[PTBR+10] = 66;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+//Stack
+[PTBR+16] = 76;
+[PTBR+17] = "0110";
+[PTBR+18] = 77;
+[PTBR+19] = "0110";
+
+
+[76*512] = [65 * 512 + 1];
+
+//pid_for_init
+[PROCESS_TABLE + 16 + 1] = 1;
+
+//init_process_gets_Scheduled_first
+[PROCESS_TABLE + 16 + 4]=CREATED;
+
+//user_area_page
+[PROCESS_TABLE + 16 + 11] = 80;
+
+//KPTR_for_init
+[PROCESS_TABLE + 16  + 12] = 0;
+
+//UPTR_for_init
+[PROCESS_TABLE + 16  + 13] = 8*512;
+
+//PTBR_for_init
+[PROCESS_TABLE + 16 + 14] = PTBR;
+
+//PTLR_for_init
+[PROCESS_TABLE + 16 + 15] = PTLR;
+
+
+
+
+
+
+
+
+//assigning rest of the processes as terminated
+[PROCESS_TABLE + 2*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 3*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 4*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 5*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 6*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 7*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 8*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 9*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 10*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 11*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 12*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 13*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 14*16 + 4]=TERMINATED;
+[PROCESS_TABLE + 15*16 + 4]=TERMINATED;
+return;

@@ -1,0 +1,32 @@
+int main()
+{
+decl
+    int a,b,c,temp,remainder;
+enddecl
+
+begin
+  
+  temp = exposcall("Write" ,-2 ,"enter the val");
+  temp = exposcall("Read" , -1, a);
+  temp = exposcall("Write" ,-2 ,"enter the val");
+  temp = exposcall("Read" , -1, b);
+  
+    if(a>b) then
+        while (b != 0) do
+            remainder = a % b;
+            a = b;
+            b = remainder;
+        endwhile;
+        temp = exposcall("Write" ,-2 ,a);
+    else 
+        while (a != 0) do
+            remainder = b % a;
+            b = a;
+            a = remainder;
+        endwhile;
+        temp = exposcall("Write" ,-2 ,"gcd is:");
+        temp = exposcall("Write" ,-2 ,b);
+    endif;
+return 0;
+end 
+} 

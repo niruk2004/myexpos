@@ -1,0 +1,490 @@
+Program Loader:
+
+
+
+Exec is the "program loader" of eXpOS. Exec takes as input a filename. It first checks whether 
+the file is a valid eXpOS executable stored in the XSM disk, adhering to the XEXE format. If so, 
+Exec destroys the invoking process, loads the executable file from the disk, and sets up the program 
+for execution as a process. A successful exec operation results in the termination of the invoking 
+process and hence never returns to it. 
+
+Exec first deallocates all pages the invoking process is using. These include two heap pages, two 
+user stack pages, code pages occupied by the process and the user area page. It also invalidates the 
+entries of the page table of the invoking process. Note that the newly scheduled process will have 
+the same PID as that of the invoking process. Hence the same process table entry and page table of 
+the invoking process will be used by the newly loaded process. Exec calls the Exit Process function 
+in the process manager module (module 1) to deallocate the pages and to terminate the current process.
+
+
+As mentioned earlier, Exit Process function releases the user area page of the current process. Since 
+Exec system call runs in kernel mode and needs a kernel stack for its own execution, after coming back 
+from Exit process function, exec reclaims the same user area page for the new process. Further, exec 
+acquires two heap, two stack and the required number of code pages (number of disk blocks in the inode 
+entry of the file in the inode table) for the new process. New pages will be acquired by invoking the 
+Get Free Page function present in the memory manager module (module 2). 
+
+
+
+
+    Exit Process (function number = 3, process manager module)
+
+    The first function invoked in the exec system call is the Exit Process function. Exit Process function 
+    takes PID of a process as an argument (In this stage, PID of the current process is passed). Exit process 
+    deallocates all the pages of the invoked process. It deallocates the pages present in the page table by 
+    invoking another function called Free Page Table present in the same module. Further, The Exit Process 
+    deallocates the user area page by invoking Free User Area Page in the same module. The state of the process 
+    (corresponding to the given PID) is set to TERMINATED. This is not the final Exit process function. There 
+    will be minor modifications to this function in the later stages.
+
+
+
+    Free Page Table (function number = 4, process manager module)
+
+    The Free Page Table function takes PID of a process as an argument (In this stage, PID of the current 
+    process is passed). In the function Free Page Table , for every valid entry in the page table of the 
+    process, the corresponding page is freed by invoking the Release Page function present in the memory manager 
+    module. Since the library pages are shared by all the processes, do not invoke the Release Page function for 
+    the library pages. Free Page Table function invalidates all the page table entries of the process with given 
+    PID. The part of the Free Page Table function involving updates to the Disk Map Table will be taken care in 
+    subsequent stages.
+
+
+
+    Free User Area Page (function number = 2, process manager module)
+
+    The function Free User Area Page takes PID of a process (In this stage, PID of the current process is passed) 
+    as an argument. The user area page number of the process is obtained from the process table entry corresponding 
+    to the PID. This user area page is freed by invoking the Release Page function from the memory manager module. 
+    However, since we are using Free User Area Page to release the user area page of the current process one needs 
+    to be careful here. The user area page holds the kernel stack of the current process. Hence, releasing this page 
+    means that the page holding the return address for the call to Free User Area Page function itself has been 
+    released! Neverthless the return address and the saved context of the calling process will not be lost. This 
+    is because Release Page function is non blocking and hence the page will never be allocated to another process 
+    before control transfers back to the caller. (Free User Area Page function also releases the resourses like files 
+    and semaphores acquired by the process. We will look into it in later stages.)
+
+
+
+    Release Page (function number = 2, memory manager module)
+
+    The Release Page function takes the page number to be released as an argument. The Release Page function decrements 
+    the value in the memory free list corresponding to the page number given as an argument. Note that we don't tamper 
+    with the content of the page as the page may be shared by other processes. The system status table keeps track of 
+    number of free memory pages available to use in the MEM_FREE_COUNT field. When the memory free list entry of the 
+    page becomes zero, no process is currently using the page. In this case, increment the value of MEM_FREE_COUNT in 
+    the system status table indicating that the page has become free for fresh allocation. Finally, Release page 
+    function must check whether there are processes in WAIT_MEM state (these are processes blocked, waiting for memory 
+    to become available). If so, these processes have to be set to READY state as memory has become available now. At 
+    present, the OS does not set any process to WAIT_MEM state and this check is superfluous. However, in later stages, 
+    the OS will set processes to WAIT_MEM state when memory is temporarily unavailable, and hence when memory is released 
+    by some process, the waiting processes have to be set to READY state.
+
+
+
+    Get Free Page (function number = 1, memory manager module)
+
+    To acquire the pages for the new process, exec calls the module function Get Free Page. The function returns the 
+    page number of the page allocated. Fundamentally, Get Free page searches through the memory free list to find a free 
+    page for the allocation. If a free page is found, memory free list entry corresponding to that page is incremented 
+    and number of the page found is returned.
+
+    If no memory page is free (MEM_FREE_COUNT in the system status table is 0), then state of the process is changed to 
+    WAIT_MEM and the scheduler is invoked. This process is scheduled again, when the memory is available (state of this 
+    process is changed to READY by some other process). The field WAIT_MEM_COUNT in the system status table stores the 
+    number of processes waiting to acquire a memory page. The Get Free Page function increments the WAIT_MEM_COUNT before 
+    changing state to WAIT_MEM. The process waits in the WAIT_MEM state until any memory page is available for use. Upon 
+    waking up, the Get Free Page function allocates the free memory page and updates the WAIT_MEM_COUNT and MEM_FREE_COUNT 
+    in the system status table.
+
+q2:
+breakpoint was applied on beginning and end of the release page and get free page functions in module 2:
+
+
+
+
+niranjan@niranjan-Victus:~/myexpos/xsm$ ./xsm --debug
+Previous instruction at IP = 24592: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 24594, Page No. = 48: CALL 20480
+debug> c
+enter name
+Previous instruction at IP = 24618: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 24620, Page No. = 48: CALL 20480
+debug> c
+Previous instruction at IP = 7350: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 7352, Page No. = 14: CALL 24576
+debug> sst
+Current User ID: 
+Current PID: 1
+Memory Free Count: 45
+Wait Memory Count: 0
+Swapped Count: 
+Paging Status: 
+debug> mf
+0       1               1       1               2       1               3       1
+4       1               5       1               6       1               7       1
+8       1               9       1               10      1               11      1
+12      1               13      1               14      1               15      1
+16      1               17      1               18      1               19      1
+20      1               21      1               22      1               23      1
+24      1               25      1               26      1               27      1
+28      1               29      1               30      1               31      1
+32      1               33      1               34      1               35      1
+36      1               37      1               38      1               39      1
+40      1               41      1               42      1               43      1
+44      1               45      1               46      1               47      1
+48      1               49      1               50      1               51      1
+52      1               53      1               54      1               55      1
+56      1               57      1               58      1               59      1
+60      1               61      1               62      1               63      1
+64      1               65      1               66      1               67      1
+68      1               69      1               70      1               71      1
+72      1               73      1               74      1               75      1
+76      1               77      1               78      1               79      1
+80      1               81      0               82      0               83      0
+84      0               85      0               86      0               87      0
+88      0               89      0               90      0               91      0
+92      0               93      0               94      0               95      0
+96      0               97      0               98      0               99      0
+100     0               101     0               102     0               103     0
+104     0               105     0               106     0               107     0
+108     0               109     0               110     0               111     0
+112     0               113     0               114     0               115     0
+116     0               117     0               118     0               119     0
+120     0               121     0               122     0               123     0
+124     0               125     0               126     0               127     0
+debug> c
+e1to100.xsm
+Previous instruction at IP = 7354: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 7356, Page No. = 14: POP R5
+debug> sst
+Current User ID: 
+Current PID: 1
+Memory Free Count: 45
+Wait Memory Count: 0
+Swapped Count: 
+Paging Status: 
+debug> mf
+0       1               1       1               2       1               3       1
+4       1               5       1               6       1               7       1
+8       1               9       1               10      1               11      1
+12      1               13      1               14      1               15      1
+16      1               17      1               18      1               19      1
+20      1               21      1               22      1               23      1
+24      1               25      1               26      1               27      1
+28      1               29      1               30      1               31      1
+32      1               33      1               34      1               35      1
+36      1               37      1               38      1               39      1
+40      1               41      1               42      1               43      1
+44      1               45      1               46      1               47      1
+48      1               49      1               50      1               51      1
+52      1               53      1               54      1               55      1
+56      1               57      1               58      1               59      1
+60      1               61      1               62      1               63      1
+64      1               65      1               66      1               67      1
+68      1               69      1               70      1               71      1
+72      1               73      1               74      1               75      1
+76      1               77      1               78      1               79      1
+80      1               81      0               82      0               83      0
+84      0               85      0               86      0               87      0
+88      0               89      0               90      0               91      0
+92      0               93      0               94      0               95      0
+96      0               97      0               98      0               99      0
+100     0               101     0               102     0               103     0
+104     0               105     0               106     0               107     0
+108     0               109     0               110     0               111     0
+112     0               113     0               114     0               115     0
+116     0               117     0               118     0               119     0
+120     0               121     0               122     0               123     0
+124     0               125     0               126     0               127     0
+debug> c
+Previous instruction at IP = 22668: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22670, Page No. = 44: MOV R16,29184
+debug> c
+Previous instruction at IP = 22760: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22762, Page No. = 44: RET
+debug> sst
+Current User ID: 
+Current PID: 1
+Memory Free Count: 46
+Wait Memory Count: 0
+Swapped Count: 
+Paging Status: 
+debug> mf
+0       1               1       1               2       1               3       1
+4       1               5       1               6       1               7       1
+8       1               9       1               10      1               11      1
+12      1               13      1               14      1               15      1
+16      1               17      1               18      1               19      1
+20      1               21      1               22      1               23      1
+24      1               25      1               26      1               27      1
+28      1               29      1               30      1               31      1
+32      1               33      1               34      1               35      1
+36      1               37      1               38      1               39      1
+40      1               41      1               42      1               43      1
+44      1               45      1               46      1               47      1
+48      1               49      1               50      1               51      1
+52      1               53      1               54      1               55      1
+56      1               57      1               58      1               59      1
+60      1               61      1               62      1               63      1
+64      1               65      1               66      1               67      1
+68      1               69      1               70      1               71      1
+72      1               73      1               74      1               75      1
+76      1               77      1               78      0               79      1
+80      1               81      0               82      0               83      0
+84      0               85      0               86      0               87      0
+88      0               89      0               90      0               91      0
+92      0               93      0               94      0               95      0
+96      0               97      0               98      0               99      0
+100     0               101     0               102     0               103     0
+104     0               105     0               106     0               107     0
+108     0               109     0               110     0               111     0
+112     0               113     0               114     0               115     0
+116     0               117     0               118     0               119     0
+120     0               121     0               122     0               123     0
+124     0               125     0               126     0               127     0
+debug> c
+Previous instruction at IP = 22668: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22670, Page No. = 44: MOV R16,29184
+debug> sst
+Current User ID: 
+Current PID: 1
+Memory Free Count: 46
+Wait Memory Count: 0
+Swapped Count: 
+Paging Status: 
+debug> mf
+0       1               1       1               2       1               3       1
+4       1               5       1               6       1               7       1
+8       1               9       1               10      1               11      1
+12      1               13      1               14      1               15      1
+16      1               17      1               18      1               19      1
+20      1               21      1               22      1               23      1
+24      1               25      1               26      1               27      1
+28      1               29      1               30      1               31      1
+32      1               33      1               34      1               35      1
+36      1               37      1               38      1               39      1
+40      1               41      1               42      1               43      1
+44      1               45      1               46      1               47      1
+48      1               49      1               50      1               51      1
+52      1               53      1               54      1               55      1
+56      1               57      1               58      1               59      1
+60      1               61      1               62      1               63      1
+64      1               65      1               66      1               67      1
+68      1               69      1               70      1               71      1
+72      1               73      1               74      1               75      1
+76      1               77      1               78      0               79      1
+80      1               81      0               82      0               83      0
+84      0               85      0               86      0               87      0
+88      0               89      0               90      0               91      0
+92      0               93      0               94      0               95      0
+96      0               97      0               98      0               99      0
+100     0               101     0               102     0               103     0
+104     0               105     0               106     0               107     0
+108     0               109     0               110     0               111     0
+112     0               113     0               114     0               115     0
+116     0               117     0               118     0               119     0
+120     0               121     0               122     0               123     0
+124     0               125     0               126     0               127     0
+debug> c
+Previous instruction at IP = 22760: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22762, Page No. = 44: RET
+debug> sst
+Current User ID: 
+Current PID: 1
+Memory Free Count: 47
+Wait Memory Count: 0
+Swapped Count: 
+Paging Status: 
+debug> mf
+0       1               1       1               2       1               3       1
+4       1               5       1               6       1               7       1
+8       1               9       1               10      1               11      1
+12      1               13      1               14      1               15      1
+16      1               17      1               18      1               19      1
+20      1               21      1               22      1               23      1
+24      1               25      1               26      1               27      1
+28      1               29      1               30      1               31      1
+32      1               33      1               34      1               35      1
+36      1               37      1               38      1               39      1
+40      1               41      1               42      1               43      1
+44      1               45      1               46      1               47      1
+48      1               49      1               50      1               51      1
+52      1               53      1               54      1               55      1
+56      1               57      1               58      1               59      1
+60      1               61      1               62      1               63      1
+64      1               65      1               66      1               67      1
+68      1               69      1               70      1               71      1
+72      1               73      1               74      1               75      1
+76      1               77      1               78      0               79      0
+80      1               81      0               82      0               83      0
+84      0               85      0               86      0               87      0
+88      0               89      0               90      0               91      0
+92      0               93      0               94      0               95      0
+96      0               97      0               98      0               99      0
+100     0               101     0               102     0               103     0
+104     0               105     0               106     0               107     0
+108     0               109     0               110     0               111     0
+112     0               113     0               114     0               115     0
+116     0               117     0               118     0               119     0
+120     0               121     0               122     0               123     0
+124     0               125     0               126     0               127     0
+debug> c 
+Previous instruction at IP = 22668: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22670, Page No. = 44: MOV R16,29184
+debug> sst
+Current User ID: 
+Current PID: 1
+Memory Free Count: 47
+Wait Memory Count: 0
+Swapped Count: 
+Paging Status: 
+debug> mf
+0       1               1       1               2       1               3       1
+4       1               5       1               6       1               7       1
+8       1               9       1               10      1               11      1
+12      1               13      1               14      1               15      1
+16      1               17      1               18      1               19      1
+20      1               21      1               22      1               23      1
+24      1               25      1               26      1               27      1
+28      1               29      1               30      1               31      1
+32      1               33      1               34      1               35      1
+36      1               37      1               38      1               39      1
+40      1               41      1               42      1               43      1
+44      1               45      1               46      1               47      1
+48      1               49      1               50      1               51      1
+52      1               53      1               54      1               55      1
+56      1               57      1               58      1               59      1
+60      1               61      1               62      1               63      1
+64      1               65      1               66      1               67      1
+68      1               69      1               70      1               71      1
+72      1               73      1               74      1               75      1
+76      1               77      1               78      0               79      0
+80      1               81      0               82      0               83      0
+84      0               85      0               86      0               87      0
+88      0               89      0               90      0               91      0
+92      0               93      0               94      0               95      0
+96      0               97      0               98      0               99      0
+100     0               101     0               102     0               103     0
+104     0               105     0               106     0               107     0
+108     0               109     0               110     0               111     0
+112     0               113     0               114     0               115     0
+116     0               117     0               118     0               119     0
+120     0               121     0               122     0               123     0
+124     0               125     0               126     0               127     0
+debug> c
+Previous instruction at IP = 22760: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22762, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22668: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22670, Page No. = 44: MOV R16,29184
+debug> c
+Previous instruction at IP = 22760: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22762, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22668: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22670, Page No. = 44: MOV R16,29184
+debug> c
+Previous instruction at IP = 22760: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22762, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22668: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22670, Page No. = 44: MOV R16,29184
+debug> c
+Previous instruction at IP = 22760: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22762, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22668: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22670, Page No. = 44: MOV R16,29184
+debug> c
+Previous instruction at IP = 22760: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22762, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22534: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22536, Page No. = 44: MOV R16,29560
+debug> c
+Previous instruction at IP = 22656: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22658, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22534: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22536, Page No. = 44: MOV R16,29560
+debug> c
+Previous instruction at IP = 22656: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22658, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22534: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22536, Page No. = 44: MOV R16,29560
+debug> c
+Previous instruction at IP = 22656: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22658, Page No. = 44: RET
+debug> c
+Previous instruction at IP = 22534: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22536, Page No. = 44: MOV R16,29560
+debug> c
+Previous instruction at IP = 22656: BRKP
+Mode: KERNEL     PID: 1
+Next instruction at IP = 22658, Page No. = 44: RET
+debug> sst
+Current User ID: 
+Current PID: 1
+Memory Free Count: 47
+Wait Memory Count: 0
+Swapped Count: 
+Paging Status: 
+debug> mf
+0       1               1       1               2       1               3       1
+4       1               5       1               6       1               7       1
+8       1               9       1               10      1               11      1
+12      1               13      1               14      1               15      1
+16      1               17      1               18      1               19      1
+20      1               21      1               22      1               23      1
+24      1               25      1               26      1               27      1
+28      1               29      1               30      1               31      1
+32      1               33      1               34      1               35      1
+36      1               37      1               38      1               39      1
+40      1               41      1               42      1               43      1
+44      1               45      1               46      1               47      1
+48      1               49      1               50      1               51      1
+52      1               53      1               54      1               55      1
+56      1               57      1               58      1               59      1
+60      1               61      1               62      1               63      1
+64      1               65      1               66      1               67      1
+68      1               69      1               70      1               71      1
+72      1               73      1               74      1               75      1
+76      1               77      1               78      0               79      0
+80      1               81      0               82      0               83      0
+84      0               85      0               86      0               87      0
+88      0               89      0               90      0               91      0
+92      0               93      0               94      0               95      0
+96      0               97      0               98      0               99      0
+100     0               101     0               102     0               103     0
+104     0               105     0               106     0               107     0
+108     0               109     0               110     0               111     0
+112     0               113     0               114     0               115     0
+116     0               117     0               118     0               119     0
+120     0               121     0               122     0               123     0
+124     0               125     0               126     0               127     0

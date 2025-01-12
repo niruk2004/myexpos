@@ -1,0 +1,51 @@
+//mode flag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 5;
+
+//storing UPTR
+alias userSP R0;
+userSP = SP;
+
+//UPTR
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 13] = userSP;
+
+//changing stack to kernel
+SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 11] * 512 - 1;
+
+//getting physical address of first argument which is file descriptor
+alias physicalPageNum R1;
+alias offset R2;
+alias fileDescPhysicalAddr R3;
+physicalPageNum = [PTBR + 2 * ((userSP - 4)/ 512)];
+offset = (userSP - 4) % 512;
+fileDescPhysicalAddr = (physicalPageNum * 512) + offset;
+alias fileDescriptor R4;
+fileDescriptor=[fileDescPhysicalAddr];
+
+//check if file descriptor is valid or not
+if (fileDescriptor != -2)
+then
+	alias physicalAddrRetVal R5;
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = -1;
+else
+	//code when argument 1 is valid
+    alias word R5;
+    //usersp - 3 is the second argument
+    word = [[PTBR + 2 * ((userSP - 3) / 512)] * 512 + ((userSP - 3) % 512)];
+    //we found physical address of the stack where word is.
+    print word;
+
+    //returning 0 to indicate success
+    alias physicalAddrRetVal R6;
+    physicalAddrRetVal = ([PTBR + 2 * (userSP - 1)/ 512] * 512) + ((userSP - 1) % 512);
+    [physicalAddrRetVal] = 0;
+
+endif;
+
+//reassigning stack pointer to userstack
+SP = userSP;
+
+//resetting mode flag in process table
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+ireturn;

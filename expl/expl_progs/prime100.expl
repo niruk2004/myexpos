@@ -1,0 +1,29 @@
+int main()
+{
+decl
+    int num, i, isPrime,x,y,temp;
+enddecl
+begin
+    num = 2;  // Start with the first prime number
+    while ( num <= 100 ) do
+        isPrime = 1; // Assume the number is prime
+        i = 2;
+        x = num / 2;
+        while ( i <= x ) do
+            y = num % i ; // Check divisibility
+            if ( y == 0 ) then
+                isPrime = 0; // Not prime
+                break;
+            endif;
+            i = i + 1;
+        endwhile;
+         
+        if ( isPrime == 1 ) then
+            temp = exposcall("Write", -2, num);
+        endif;
+         
+        num = num + 1;
+    endwhile;
+    return 0;
+end
+}

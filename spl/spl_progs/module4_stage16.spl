@@ -1,0 +1,83 @@
+alias functionNum R1;
+alias currentPID R2;
+
+//terminal write
+if(functionNum==3) then
+	
+	multipush(R1,R2,R3);
+
+	R1=8;
+	R2=currentPID;
+    breakpoint;
+	call MOD_0;
+
+    //Ignore the value present in R0 as Acquire Terminal does not have any return value.
+
+    multipop(R1,R2,R3);
+
+	//Terminal Acquired
+
+	alias word R3;
+	print word;
+
+	//Releasing terminal
+
+	multipush(R1,R2,R3);
+
+	R1=9;
+	R2=currentPID;
+    breakpoint;
+	call MOD_0;
+
+    //Return value will be stored in R0 by module 0. Save this return value in any other register if needed.
+    //we need not save this for now since we wont be using it anywhere for now.
+
+	multipop(R1,R2,R3);
+
+	return;
+
+endif;
+
+//terminal read
+if(functionNum==4) then
+	
+	multipush(R1,R2,R3);
+
+	R1=8;
+	R2=currentPID;
+
+	call MOD_0;
+
+    //Ignore the value present in R0 as Acquire Terminal does not have any return value.
+
+    multipop(R1,R2,R3);
+
+	//Terminal Acquired
+
+    read;
+
+    [PROCESS_TABLE + (currentPID*16) + 4] = WAIT_TERMINAL;
+
+	//Releasing terminal
+
+	multipush(R1,R2,R3);
+
+    //calling scheduler
+    call MOD_5;
+
+	multipop(R1,R2,R3);
+
+    alias physicalPageNum R4;
+    alias offset R5;
+    alias PhysicalAddr R6;
+    physicalPageNum = [PTBR + 2 * ((R3)/ 512)];
+    offset = (R3) % 512;
+    PhysicalAddr = (physicalPageNum * 512) + offset;
+    [PhysicalAddr] = [PROCESS_TABLE + (currentPID*16) + 8];
+	return;
+
+else
+
+    return;
+
+endif;

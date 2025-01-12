@@ -1,0 +1,18 @@
+int main(){
+decl
+	int x;
+	str name;
+enddecl
+	
+begin
+    x = exposcall("Write", -2, "enter name");
+	x = exposcall("Read", -1, name);
+	x = exposcall("Exec", name);
+	
+	if(x == -1) then
+		x = exposcall("Write", -2, "FNF in Disk");
+	endif;
+return 0;
+
+end
+}
