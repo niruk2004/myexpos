@@ -3,6 +3,37 @@
 alias functionNum R1;
 alias currentPID R2;
 
+//disk load
+if(functionNum==2) then
+
+    alias pagenum R3;
+    alias blocknum R4;
+
+    //aquire the disk
+    backup;
+    R1 = 3;
+    R2 = currentPID;
+    call MOD_0;
+    restore;
+
+    //disk table entries (load -> 0 , pagenum, blocknum )
+	[DISK_STATUS_TABLE+1]=0;
+	[DISK_STATUS_TABLE+2]=pagenum; 
+	[DISK_STATUS_TABLE+3]=blocknum;
+
+	load(pagenum,blocknum);
+
+    //setting the state to wait_Disk for the process
+	[PROCESS_TABLE + (currentPID*16) + 4] = WAIT_DISK;	
+
+	//changing process since we are waiting for the transfer to complete
+	backup;
+	call MOD_5; 
+	restore;
+
+	return;
+endif;
+
 //terminal write
 if(functionNum==3) then
 	
@@ -10,7 +41,6 @@ if(functionNum==3) then
 
 	R1=8;
 	R2=currentPID;
-    breakpoint;
 	call MOD_0;
 
     //Ignore the value present in R0 as Acquire Terminal does not have any return value.
@@ -28,7 +58,6 @@ if(functionNum==3) then
 
 	R1=9;
 	R2=currentPID;
-    breakpoint;
 	call MOD_0;
 
     //Return value will be stored in R0 by module 0. Save this return value in any other register if needed.
