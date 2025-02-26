@@ -1,0 +1,31 @@
+Default value of timer interrupt is 20.
+
+when will the scheduler be called?
+-   from timer interrupt , when a process halts , when the running process is waiting for console input ,
+    when the current process needs a resource which is occupied by another process , during the async 
+    function disk load , waiting for memory page (when it is not available).
+
+API and ABI:
+    API is for the userprogram to call the systemcalls using exposcall
+    ABI serves as an interface between the user program and the kernel. It consists of the virtual address 
+    space model, xexe executable format,low level system call interface and the low level runtime library interface.
+    The application programs will be using the high level library interface for invoking system calls. The ExpL 
+    compiler is responsible for generating assembly language code to translate the call to a corresponding library 
+    call using the low level library interface. The ExpL library which is pre-loaded into the system memory during 
+    eXpOS boot up contains assembly language code that redirects the library call to the corresponding eXpOS system 
+    call using the low level system call interface described here. If you write assembly language application 
+    programs as user programs, then you can use the low level system call interface directly bye-passing the library.
+
+XEXE format:
+    header - 8 bits and code part
+    header:
+        XMAGIC number - 0  for all XEXE files. indicates file type
+        Entry point
+        text size
+        data size
+        heap size
+        stack size
+        library flag
+        unused
+
+    

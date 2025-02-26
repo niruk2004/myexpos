@@ -5,18 +5,6 @@ SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
 backup;
 
 
-//these are now implemented in scheduler
-//alias currentPID R0;
-//currentPID = [SYSTEM_STATUS_TABLE+1];
-
-//alias process_table_entry R1;
-//process_table_entry = PROCESS_TABLE + currentPID * 16;
-
-//[process_table_entry + 12] = SP % 512;
-//[process_table_entry + 14] = PTBR;
-//[process_table_entry + 15] = PTLR;
-
-
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 4] = READY;
 
 //Loop through the process table entires and increment the TICK field of each process IS NOT DONE in this stage

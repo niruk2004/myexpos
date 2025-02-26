@@ -1,0 +1,93 @@
+
+//Setting mode flag to -1
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = -1; 
+
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP; 
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+backup;
+multipush(EIP);
+if(EC==1) then
+	
+	print "Illegal_Instr";
+	backup;
+    //CALL EXIT PROCESS
+	R1=3; 
+	R2=[SYSTEM_STATUS_TABLE + 1];
+	call MOD_1;
+	restore;
+
+	//CALL SCHEDULER
+	call MOD_5;
+
+endif;
+
+if(EC==2) then
+
+	print "Illegal_mem_acc";
+	backup;
+    //CALL EXIT PROCESS
+	R1=3;
+	R2=[SYSTEM_STATUS_TABLE + 1];
+	call MOD_1;
+	restore;
+
+	//Invoking Scheduler
+	call MOD_5;
+endif;
+
+
+if(EC==3) then
+	print "ArithmeticExec";
+	backup;
+    //CALL EXIT PROCESS
+	R1=3; 
+	R2=[SYSTEM_STATUS_TABLE + 1];
+	call MOD_1;
+	restore;
+
+	//Invoking Scheduler
+	call MOD_5;
+endif;
+
+if(EC==0) then
+
+	//code page missing
+	if(EPN==4 || EPN==5 || EPN==6 || EPN==7) then
+
+		backup;
+			//calling getcodepage
+			R1=5;
+			R2=[SYSTEM_STATUS_TABLE+1];
+			R3=[DISK_MAP_TABLE + 10*[SYSTEM_STATUS_TABLE+1]+EPN];
+			call MOD_2;
+			
+			[PAGE_TABLE_BASE+[SYSTEM_STATUS_TABLE+1]*20 + 2*EPN]=R0;
+			[PAGE_TABLE_BASE+[SYSTEM_STATUS_TABLE+1]*20 + 2*EPN + 1]="1100";
+		restore;
+	endif;
+
+	//heap page missing
+	if(EPN==2 || EPN==3) then
+		backup;
+		//calling get free page
+		R1=1;
+		call MOD_2;
+		[PAGE_TABLE_BASE+[SYSTEM_STATUS_TABLE+1]*20 + 2*EPN]=R0;
+		[PAGE_TABLE_BASE+[SYSTEM_STATUS_TABLE+1]*20 + 2*EPN + 1]="1110";
+		restore;
+	endif;
+
+endif;
+
+//mode flag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+multipop(EIP);
+restore;
+
+//changing back to user stack and storing the EIP value on top of user stack to return
+SP=[PROCESS_TABLE+([SYSTEM_STATUS_TABLE+1]*16)+13];
+SP=SP+1;
+[[PTBR+2*(SP/512)]*512+(SP%512)]=EIP;
+
+ireturn;
