@@ -13,10 +13,10 @@ process_table_entry = PROCESS_TABLE + currentPID * 16;
 
 
 //finding the new process
-alias tempPID R2;
+alias tempPID R10;
 tempPID=currentPID+1;
 
-alias newPID R3;
+alias newPID R2;
 newPID=0;
 tempPID=currentPID+1;
 while(tempPID<=15) do
@@ -28,7 +28,7 @@ while(tempPID<=15) do
 endwhile;
 
 
-alias new_process_table R4;
+alias new_process_table R13;
 new_process_table = PROCESS_TABLE + newPID * 16;
 
 
@@ -43,6 +43,7 @@ PTLR = [new_process_table + 15];
 if([new_process_table + 4] == CREATED) then
 	[new_process_table + 4] = RUNNING;
 	SP = [new_process_table + 13];
+    BP = [[new_process_table + 11] * 512 ];
     [new_process_table + 9] = 0;
 	ireturn;
     

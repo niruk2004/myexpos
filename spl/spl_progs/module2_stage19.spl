@@ -38,14 +38,7 @@ if(functionNum==1) then
 
 endif;
 
-//release block
-if(functionNum==4) then 
 
-	alias block_no R2;
-	[DISK_FREE_LIST+block_no]=[DISK_FREE_LIST+block_no]-1;
-	return;
-
-endif;
 
 //Release page
 if(functionNum==2) then 
@@ -55,6 +48,7 @@ if(functionNum==2) then
 	if([MEMORY_FREE_LIST+R2]==0) then
 		[SYSTEM_STATUS_TABLE+2]=[SYSTEM_STATUS_TABLE+2]+1; 
 
+		//change wiatmem processes to ready
 		alias i R4;
 		i=0;
 		while(i<16) do
@@ -68,55 +62,83 @@ if(functionNum==2) then
 	return;
 endif;
 
+//release block
+if(functionNum==4) then 
 
-
-//getcodeppage
-if(functionNum==5) then
-	
-	alias currentPID R12;
-	alias block_no R13;
-	currentPID=R2;
-	block_no=R3;
-
-	alias i R4;
-	alias disk_map R5;
-	alias j R6;
-	i=0;
-	j=4;
-
-	//Checking if the required block is already present as any code page for every process
-	while(i<=15) do
-		disk_map = DISK_MAP_TABLE + 10*i;
-		
-		while (j<8) do 
-			if([disk_map+j]==block_no) then 
-				if([PAGE_TABLE_BASE + i*20 + j*2]!=-1) then
-					R0=[PAGE_TABLE_BASE + i*20 + j*2];
-					[MEMORY_FREE_LIST+R0]=[MEMORY_FREE_LIST+R0]+1; //incrementng memory free list
-					return;
-				endif;
-			endif;
-		j = j + 1;
-		endwhile ;
-
-		i = i + 1;
-	endwhile;
-
-	
-	//this is executed if code page was not found -  i.e we have to call getfreepage 
-	//and use diskload and then return the memory page number to which it was loaded
-
-		//calling getfreepage
-		R1=1;
-		call MOD_2;
-
-		//calling Disk load
-		R1=2; 
-		R2=currentPID; 
-		R3=R0; 
-		R4=block_no;
-		call MOD_4; 
-		
+	alias block_no R2;
+	[DISK_FREE_LIST+block_no]=[DISK_FREE_LIST+block_no]-1;
 	return;
 
+endif;
+
+//getcodeppage
+if (functionNum == 5) then
+
+    alias blockNumber R2;
+    alias currentPID R3;
+    alias counter R4;
+    alias process R5;
+    alias flag R6;
+    alias targetPage R7;
+
+	currentPID = [SYSTEM_STATUS_TABLE + 1];
+
+    process = 1;
+    flag = 0;
+
+    // search all processes' disk map entries
+    while (process < 16) do
+        counter = 4; // start at 4th disk map entry (code pages)
+
+        // check current process's code page entries (entries 4-7)
+        while (counter < 8) do
+            // check if block matches disk map entry AND page table entry is valid
+            if ([DISK_MAP_TABLE + process*10 + counter] == blockNumber && [[PROCESS_TABLE + process*16 + 14] + 8 + (counter - 4)*2] != -1) then
+                flag = 1; //valid entry found
+                break;
+            endif;
+            counter = counter + 1;
+        endwhile;
+        if(flag == 1) then
+            break;
+        endif;
+        process = process + 1;
+    endwhile;
+
+    // calculate target page table entry address
+    targetPage = [PROCESS_TABLE + process*16 + 14] + 8 + (counter - 4)*2;
+
+    // if found valid shared code page 
+    if (flag == 1 && ([targetPage + 1] == "0100" || [targetPage + 1] == "0101" || [targetPage + 1] == "0110" || [targetPage + 1] == "0111" || [targetPage + 1] == "1100" || [targetPage + 1] == "1101" || [targetPage + 1] == "1110" || [targetPage + 1] == "1111")) then 
+        alias memoryPage R6;
+        memoryPage = [targetPage];  // get existing memory page
+
+        // increment free list count (shared page reference)
+        [MEMORY_FREE_LIST + memoryPage] = [MEMORY_FREE_LIST + memoryPage] + 1;
+
+        R0 = memoryPage; // return existing page
+		return;
+
+    // code page not in memory
+    else
+        alias memoryPage R6;
+        // get new free page
+        multipush(R0, R1, R2, R3, R4, R5);
+        functionNum = 1;
+        call MOD_2;
+        memoryPage = R0;
+        multipop(R0, R1, R2, R3, R4, R5);
+
+        // load disk block to memory page
+        multipush(R0, R1, R2, R3, R4, R5, R6);
+        functionNum = 2;
+        R4 = blockNumber;
+        R2 = currentPID;
+        R3 = memoryPage;
+        call MOD_4;
+        multipop(R0, R1, R2, R3, R4, R5, R6);
+
+        R0 = memoryPage;
+		return;
+    endif;
 endif;

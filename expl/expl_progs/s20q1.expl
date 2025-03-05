@@ -1,0 +1,26 @@
+int main(){
+decl
+	int y, x;
+	str string1;
+enddecl
+
+begin
+	x = exposcall("Fork");
+	
+	if(x == -1) then
+		string1 = "FORK_FAIL";
+		y = exposcall("Write", -2, string1);
+		
+	else
+
+		if(x != 0 ) then
+			y = exposcall("Write",-2,"parent");
+			x = exposcall("Exec", "e1to100.xsm");
+		else
+			y = exposcall("Write",-2,"child");
+			x = exposcall("Exec", "o1to100.xsm");
+		endif;
+	endif;
+return 0;
+end
+}

@@ -1,0 +1,144 @@
+// --------------------------------- INIT PROGRAM ---------------------------------
+
+PTBR = PAGE_TABLE_BASE + 20;
+PTLR = 10;
+
+// setting page table
+// ibrary
+[PTBR + 0] = 63;
+[PTBR + 1] = "0100";
+[PTBR + 2] = 64;
+[PTBR + 3] = "0100";
+
+// heap
+[PTBR + 4] = 78;
+[PTBR + 5] = "0110";
+[PTBR + 6] = 79;
+[PTBR + 7] = "0110";
+
+// code
+[PTBR + 8] = 65;
+[PTBR + 9] = "0100";
+[PTBR + 10] = 66;
+[PTBR + 11] = "0100";
+[PTBR + 12] = -1;
+[PTBR + 13] = "0000";
+[PTBR + 14] = -1;
+[PTBR + 15] = "0000";
+
+// stack
+[PTBR + 16] = 76;
+[PTBR + 17] = "0110";
+[PTBR + 18] = 77;
+[PTBR + 19] = "0110";
+
+// setting process table
+[PROCESS_TABLE + 1 * 16 + 1] = 1; 
+[PROCESS_TABLE + 1 * 16 + 4] = CREATED;
+[PROCESS_TABLE + 1 * 16 + 11] = 80;
+[PROCESS_TABLE + 1 * 16 + 12] = 0;
+[PROCESS_TABLE + 1 * 16 + 13] = 8 * 512;
+[PROCESS_TABLE + 1 * 16 + 14] = PTBR;
+[PROCESS_TABLE + 1 * 16 + 15] = PTLR;
+
+// physical address where the stack is stores the virtual entry point
+[76 * 512] = [65 * 512 + 1];
+
+// --------------------------------- IDLE PROGRAM ---------------------------------
+
+// setting up Page Table Base Register and Page Table Length Register
+PTBR = PAGE_TABLE_BASE;  //as PID of idle process is 0
+PTLR = 10;
+
+// setting up the page table for idle
+// library
+[PTBR + 0] = 63;
+[PTBR + 1] = "0100";
+[PTBR + 2] = 64;
+[PTBR + 3] = "0100";
+
+// heap
+[PTBR + 4] = 83;
+[PTBR + 5] = "0110";
+[PTBR + 6] = 84;
+[PTBR + 7] = "0110";
+
+// code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+[PTBR+10] = 70;
+[PTBR+11] = "0100";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+// stack
+[PTBR+16] = 81;
+[PTBR+17] = "0110";
+[PTBR+18] = 82;
+[PTBR+19] = "0110";
+
+// setting up process table for IDLE
+[PROCESS_TABLE + 1] = 0; // PID
+[PROCESS_TABLE + 4] = RUNNING; // STATE
+[PROCESS_TABLE + 11] = 82; //UAPAGENO
+[PROCESS_TABLE + 12] = 0; // KPTR
+[PROCESS_TABLE + 13] = 8 * 512; //UPTR
+[PROCESS_TABLE + 14] = PTBR; 
+[PROCESS_TABLE + 15] = PTLR;
+
+// physical address where the stack is stores the virtual entry point
+// first entry of idle stack
+[81*512] = [69*512 + 1];
+
+// set all other processes to TERMINATED
+alias counter R0; 
+
+counter = 2;
+while (counter < 16) do
+    [PROCESS_TABLE + (counter * 16) + 4] = TERMINATED;
+    counter = counter + 1;
+endwhile;
+
+counter = 0;
+
+//initialing mem free list;
+// set used  pages to 1 (first 82)
+while (counter <= 82) do
+    [MEMORY_FREE_LIST + counter] = 1;
+    counter = counter + 1;
+endwhile;
+
+// set unused pages to 0
+while (counter < NUM_MEM_PAGES) do
+    [MEMORY_FREE_LIST + counter] = 0;
+    counter = counter + 1;
+endwhile;
+
+// initializing DISK_MAP_TABLE
+counter = 0;
+while (counter < NUM_MEM_PAGES) do
+    [DISK_MAP_TABLE + 10 + counter] = -1;
+    counter = counter + 1;
+endwhile;
+
+// set per process resource table entries
+counter = 512-16;
+while(counter < 512) do
+    [[PROCESS_TABLE + 16 + 11]*512 + counter   ] = -1;
+    counter = counter + 1;
+endwhile;
+
+// set the resource tables to 0
+[TERMINAL_STATUS_TABLE + 0] = 0;
+[DISK_STATUS_TABLE + 0] = 0;
+
+// currently executing process - CURRENT_PI -> start with IDLE process
+[SYSTEM_STATUS_TABLE + 1] = 0;
+// MEM_FREE_COUNT
+[SYSTEM_STATUS_TABLE + 2] = NUM_MEM_PAGES - 82;
+// WAIT_MEM_COUNT
+[SYSTEM_STATUS_TABLE + 3] = 0;
+
+return;

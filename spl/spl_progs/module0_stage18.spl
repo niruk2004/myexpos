@@ -27,9 +27,9 @@ if(functionNum==8) then
 	while( ([TERMINAL_STATUS_TABLE] ) == 1) do
 
 		[ (PROCESS_TABLE + (currentPID * 16)) + 4 ] = WAIT_TERMINAL;
-		multipush(R1, R2);
+		backup;
 		call MOD_5;
-		multipop(R1, R2);
+		restore;
 
 	endwhile;
 

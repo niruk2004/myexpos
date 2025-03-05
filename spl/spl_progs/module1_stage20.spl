@@ -1,6 +1,34 @@
 alias functionNum R1; 
 alias currentPID R2;
 
+//get free pcb
+if(functionNum==1) then 
+	alias index R3;
+	alias i R4;
+	i=1;
+	index=-1;
+	while(i<16) do
+		if([PROCESS_TABLE + (i * 16) + 4]==TERMINATED) then
+			index=i;
+			break;
+		endif;
+		i=i+1;
+	endwhile;
+	if(index==-1) then
+		R0=-1;
+		return;
+	endif;
+
+	[PROCESS_TABLE + (index * 16) + 1]=index;
+	[PROCESS_TABLE + (index * 16) + 4] = ALLOCATED;
+	[PROCESS_TABLE + (index * 16) + 14]=PAGE_TABLE_BASE+index*20;
+	[PROCESS_TABLE + (index * 16) + 15]=10;
+	R0=index;
+	return;
+
+endif;
+
+
 //Free user area page
 if(functionNum==2) then
 
@@ -24,14 +52,14 @@ if(functionNum==3) then
 	//Free page table Entries
 	backup;
 	R1=4;
-	R2=currentPID;
+	//pid is alr in R2 so explicit declaration is not done
 	call MOD_1;
 	restore;
 
 	//Free User area page
 	backup;
 	R1=2;
-	R2=currentPID;
+	//pid is alr in R2 so explicit declaration is not done
 	call MOD_1;
 	restore;
 
@@ -53,8 +81,8 @@ if(functionNum==4) then
 	[PTBR+2]=-1;
 	[PTBR+3]="0000";
 
-	backup;
-    alias p R4;
+	
+    alias p R7;
     p=4;
 
     //checking for valid entries in the PT to invalidate them by calling release page
@@ -75,7 +103,7 @@ if(functionNum==4) then
         p=p+2;
 
     endwhile;
-
+	
     //checking in diskmap for stored blocks to release them
     alias disk_map R8;
 	disk_map = DISK_MAP_TABLE + 10*currentPID;
@@ -98,7 +126,6 @@ if(functionNum==4) then
 		i=i+1;
 
 	endwhile;
-	restore;
 
 	return;
 endif;

@@ -12,7 +12,7 @@ if(functionNum==2) then
     //aquire the disk
     backup;
     R1 = 3;
-    R2 = currentPID;
+	//PID IS ALR IN R2
     call MOD_0;
     restore;
 
@@ -37,7 +37,7 @@ endif;
 //terminal write
 if(functionNum==3) then
 	
-	multipush(R1,R2,R3);
+	backup;
 
 	R1=8;
 	R2=currentPID;
@@ -45,7 +45,7 @@ if(functionNum==3) then
 
     //Ignore the value present in R0 as Acquire Terminal does not have any return value.
 
-    multipop(R1,R2,R3);
+    restore;
 
 	//Terminal Acquired
 
@@ -54,7 +54,7 @@ if(functionNum==3) then
 
 	//Releasing terminal
 
-	multipush(R1,R2,R3);
+	backup;
 
 	R1=9;
 	R2=currentPID;
@@ -63,7 +63,7 @@ if(functionNum==3) then
     //Return value will be stored in R0 by module 0. Save this return value in any other register if needed.
     //we need not save this for now since we wont be using it anywhere for now.
 
-	multipop(R1,R2,R3);
+	restore;
 
 	return;
 
@@ -72,7 +72,7 @@ endif;
 //terminal read
 if(functionNum==4) then
 	
-	multipush(R1,R2,R3);
+	backup;
 
 	R1=8;
 	R2=currentPID;
@@ -81,7 +81,7 @@ if(functionNum==4) then
 
     //Ignore the value present in R0 as Acquire Terminal does not have any return value.
 
-    multipop(R1,R2,R3);
+    restore;
 
 	//Terminal Acquired
 
@@ -91,12 +91,12 @@ if(functionNum==4) then
 
 	//Releasing terminal
 
-	multipush(R1,R2,R3);
+	backup;
 
     //calling scheduler
     call MOD_5;
 
-	multipop(R1,R2,R3);
+	restore;
 
     alias physicalPageNum R4;
     alias offset R5;
@@ -112,3 +112,4 @@ else
     return;
 
 endif;
+return;

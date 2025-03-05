@@ -1,199 +1,154 @@
-[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
-SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+//breakpoint;
+//set MODE flag of the process to system call number 9 for Exec
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 9;
 
-backup;
+alias userSP R0;
+userSP = SP; // Save current user stack pointer
 
-alias userSP R0; 
-userSP=[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13]; //Saving value of user stack
+// storing user stack pointer in process table
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16 + 13)] = SP; 
 
+// setting stack pointer to kernel stack
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16 + 11)] * 512 - 1;
 
-//exec call number
-[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 9; 
+// get file name
+alias fileName R1;
+fileName = [[PTBR + 2*((userSP-4)/512)]*512 + (userSP-4)%512];
 
-
-//file name should be at sp-4 (1st argument)
-alias physicalPageNum R1;
-alias offset R2;
-alias fileNamePhyAddr R3;
-physicalPageNum = [PTBR + 2 * ((userSP - 4)/ 512)];
-offset = (userSP - 4) % 512;
-fileNamePhyAddr = (physicalPageNum * 512) + offset;
-alias fileName R4;
-fileName=[fileNamePhyAddr];
-
-
-
-//Checking in the inode copy if the file is there
-alias check R5;
-alias i R6;
-alias inode_index R7;
-
-i=0;
-check=0;
-while(i<MAX_FILE_NUM) do
-
-	if([ INODE_TABLE + 16*i + 1 ] == fileName ) then
-		check=1;
-		inode_index=i;
-		break;
-	endif;
-	i=i+1;
+// Search INODE_TABLE for executable file
+alias fileBlock R10;
+fileBlock = 0;
+while (fileBlock < MAX_FILE_NUM && [INODE_TABLE + (fileBlock*16) + 1] != fileName) do
+    fileBlock = fileBlock + 1;  
 endwhile;
 
+if (fileBlock == MAX_FILE_NUM || [INODE_TABLE + (fileBlock*16) + 0] != EXEC) then
+    alias retAddress R3;
+    retAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+    // set back the stack pointer to kernal here
+    SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 13];
+    [retAddress] = -1;
+else
+    // cleanup Previous Process 
+    multipush(R0, R1, R2, R3, R10);
+    R1 = 3; //functionNumber for EXIT_PROCESS 
+    R2 = [SYSTEM_STATUS_TABLE+1];
+    call PROCESS_MANAGER;
+    multipop(R0, R1, R2, R3, R10);
 
-//if we could not find the required file in the inode copy
-if(check==0) then
+    // get the user page number and increment the memory free list and decrement the mem free count
+    alias userPageNum R4;
+    userPageNum = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 11];
+    [MEMORY_FREE_LIST + userPageNum] = [MEMORY_FREE_LIST + userPageNum] + 1;
+    [SYSTEM_STATUS_TABLE + 2] = [SYSTEM_STATUS_TABLE + 2] - 1;
 
-	//return value is -1
-	alias physicalAddrRetVal R8;
-	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
-	[physicalAddrRetVal] = -1;
+    // initialize New Process
+    // set the sp to start of user area page
+    SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 11]*512 - 1; // new kernal stack
 
-	//reset mode flag
-	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-	
-	//changing back to user stack
-	SP = userSP;
+    // initialize resource table
+    alias counter R5;
+    alias resourceTable R6;
+    resourceTable = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 + RESOURCE_TABLE_OFFSET;
+    counter = 0;
+    while (counter < 8) do
+        [resourceTable + counter*2 + 0] = -1;
+        [resourceTable + counter*2 + 1] = -1;
+        counter = counter+1;
+    endwhile;
 
-	ireturn;
+    // set the STATE field to RUNNING and store inode index obtained above in the inode index 
+    // field in the process table
+    [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 4] = RUNNING;
+    [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 7] = fileBlock;
+    
+    // allocate new pages
+    PTBR = PAGE_TABLE_BASE + [SYSTEM_STATUS_TABLE+1]*20; // new page table base
 
+    // library
+    [PTBR + 0] = 63;
+    [PTBR + 1] = "0100";
+    [PTBR + 2] = 64;
+    [PTBR + 3] = "0100";
+
+    //2 pages for heap
+    [PTBR + 4] = -1;
+    [PTBR + 5] = "0000";
+    [PTBR + 6] = -1;
+    [PTBR + 7] = "0000";
+
+    // allocate memory
+    // get code page
+    multipush(R0, R1, R2, R3, R4, R5, R6, R10);
+    R1 = 5;
+    R2 = [INODE_TABLE + fileBlock*16 + 8];
+    R3 = [SYSTEM_STATUS_TABLE+1];
+    call MEMORY_MANAGER;
+    R11 = R0;
+    multipop(R0, R1, R2, R3, R4, R5, R6, R10);
+
+    [PTBR + 8] = R11;
+    [PTBR + 9] = "0100";
+
+    alias i R5;
+    alias pageNumber R6;
+    i = 9;
+    pageNumber = 10;
+
+    while (i < 12) do 
+        [PTBR + pageNumber] = -1;
+        [PTBR + pageNumber + 1] = "0000";
+
+        i = i + 1;
+        pageNumber = pageNumber + 2;
+    endwhile;
+
+    // allocate 2 pages for stack
+    multipush(R0, R1, R2, R3, R4, R5, R6, R10);
+    R1 = 1;
+    call MEMORY_MANAGER;
+    R11 = R0;
+    multipop(R0, R1, R2, R3, R4, R5, R6, R10);
+    [PTBR + 16] = R11;
+    [PTBR + 17] = "0110";
+    
+    multipush(R0, R1, R2, R3, R4, R5, R6, R10);
+    R1 = 1;
+    call MEMORY_MANAGER;
+    R11 = R0;
+    multipop(R0, R1, R2, R3, R4, R5, R6, R10);
+    [PTBR + 18] = R11;
+    [PTBR + 19] = "0110";
+    
+    // initialize execution context 
+    [[PTBR + 16]*512] = [[PTBR + 8]*512 + 1]; // Set entry point
+    SP = 8*512; // Set stack pointer
+
+    // setting the DISK map table
+    i = 0;
+    while (i < 10) do
+        [DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10 + i] = -1;
+        i = i + 1;
+    endwhile;
+
+    // map code blocks from inode
+    i = 4;
+    alias codeBlock R6;
+    codeBlock = 8;
+
+    while ([INODE_TABLE + fileBlock*16 + codeBlock] != -1) do
+        [DISK_MAP_TABLE + [SYSTEM_STATUS_TABLE+1]*10 + i] = [INODE_TABLE + fileBlock*16 + codeBlock];
+        i = i + 1;
+        codeBlock = codeBlock + 1;
+    endwhile;
+
+    // return statement
+    alias retAddress R3;
+    retAddress = [PTBR + 2*((userSP-1)/512)]*512 + (userSP-1)%512;
+    [retAddress] = 0;
 endif;
 
-
-//if check was not 0 then we have the inode index ready so now are going to call mod 1 (process manager)
-//with appropriate arguments ready in registers for calling the exit process function in MOD_1
-
-//saving the register context (could use multipush too)
-backup;
-
-R1=3;
-R2=[SYSTEM_STATUS_TABLE + 1];
-
-call MOD_1;
-
-restore;
-
-//after the exit process, the user area page has been deallocated so we have to reclaim it
-alias userAreaPageNo R8;
-userAreaPageNo=[PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+11];
-
-//Reclaiming the same page by incrementing the memory free list entry of user area page
-
-//incrementing the MEMORY_FREE_LIST. this refers to how many processes are using that page
-[MEMORY_FREE_LIST+userAreaPageNo]=[MEMORY_FREE_LIST+userAreaPageNo]+1;
-
-//decrementing the MEM_FREE_COUNT in the system status table. This refers to the number of pages which are free
-[SYSTEM_STATUS_TABLE+2]=[SYSTEM_STATUS_TABLE+2]-1;
-
-//Set the SP to the start of the user area page to intialize the kernel stack of the new process
-SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
-
-//this was made to terminated before by the exit process
-[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 4]=RUNNING;
-
-//inode index update 
-[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 7]=inode_index;
-
-
-
-//per process table (with -1 in this stage)
-i = 496;		
-while(i < 512) do
-	[userAreaPageNo *512 + i] = -1;
-i = i + 2;
-endwhile;
-
-
-
-//setting up the page table of the new process
-
-PTBR=PAGE_TABLE_BASE+[SYSTEM_STATUS_TABLE+1]*20;
-
-//Library
-[PTBR+0]=63;
-[PTBR+1]="0100";
-[PTBR+2]=64;
-[PTBR+3]="0100";
-
-//heap
-[PTBR+4]=-1;
-[PTBR+5]="0000";
-[PTBR+6]=-1;
-[PTBR+7]="0000";
-
-
-//Set first code page using getcodeppage rest are invalidated 
-backup;
-
-R1=5;
-R2=[SYSTEM_STATUS_TABLE+1];
-
-//first code block is the argument
-R3=[INODE_TABLE+ 16*inode_index + 8];
-
-call MOD_2;
-
-[PTBR+8]=R0; 
-[PTBR+9]="0100";
-
-restore;
-
-
-//Invalidating rest 3 code pages
-backup;
-alias t R8;
-t=10;
-while(t<=14) do
-	[PTBR+t]=-1;
-	[PTBR+t+1]="0000";
-	t=t+2;
-endwhile;
-restore;
-
-
-//stack
-backup;
-R1=1;
-call MOD_2;
-[PTBR+16]=R0;
-[PTBR+17]="0110";
-restore;
-
-backup;
-R1=1;
-call MOD_2;
-[PTBR+18]=R0;
-[PTBR+19]="0110";
-restore;
-
-
-//Initialising disk map table of new process
-backup;
-alias currPID R10;
-alias q R9;
-currPID = [SYSTEM_STATUS_TABLE + 1];
-q=0;
-while(q < 10) do
-	[DISK_MAP_TABLE + currPID*10 + q] = -1;
-q = q + 1;
-endwhile;
-restore;
-
-[DISK_MAP_TABLE + currPID*10 + 4] = [INODE_TABLE + inode_index*16 + 8]; 
-[DISK_MAP_TABLE + currPID*10 + 5] = [INODE_TABLE + inode_index*16 + 9] ;
-[DISK_MAP_TABLE + currPID*10 + 6] = [INODE_TABLE + inode_index*16 + 10] ;
-[DISK_MAP_TABLE + currPID*10 + 7] = [INODE_TABLE + inode_index*16 + 11] ;
-
-
-//setting entry point - stack 
-[[PTBR+16]*512] = [[PTBR+8]*512+1];
-
-//reset mode flag
-[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
-
-restore;
-
-//changing back to user stack
-SP=8*512;
-
+// cleanup
+[PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 9] = 0;
+//breakpoint;
 ireturn;
