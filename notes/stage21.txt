@@ -1,0 +1,55 @@
+Process synchronization:
+
+
+access control AND synchronization:
+
+Two concurrently executing processes sharing resources like files or memory (for example, parent and child processes 
+sharing the heap) would like to ensure that only one of them execute critical section code that access/modify a 
+resource that is shared between them.
+
+A classical solution to this problem is using semaphores. A process can acquire a semaphore using the Semget system 
+call and share it with its child (or later generation) processes. A semaphore can be locked by any of these sharing 
+processes using the SemLock system call and the execution of all other processes trying to lock the same semaphore 
+subsequently will be suspended (blocked) by the OS until the locking process unlocks the semaphore using the 
+SemUnlock system call.
+
+The Wait system call allows a process to suspend its own execution until another process wakes it up using the 
+Signal system call. This primitive is useful when a process must be made to wait at a point during its execution 
+until another related process signals it to continue.
+
+
+PROCESS synchronization:
+eXpOS provides the Wait and Signal system calls for process synchronization. When a process executes the wait 
+system call specifying the process id of another process as argument, the OS puts the calling process to sleep. 
+This means, the OS will schedule the process out and won't execute it until one of the following events occur:
+
+    The process specified as argument terminates by the exit system call.
+    The process specified as argument executes a Signal system call. 
+
+
+
+In this stage, we will add support for process synchronization using Wait and Signal system calls to eXpOS. 
+With the help of these system calls, we will design a more advanced shell program. We will also implement Getpid 
+and Getppid system calls.
+
+
+When a process executes the Wait system call, its execution is suspended till the process whose PID is given as 
+argument to Wait terminates or executes the Signal system call. The process that enters Wait sets its state to 
+WAIT_PROCESS and invokes the scheduler.
+
+A process executes the Signal system call to wake up all the processes waiting for it. If a process terminates 
+without invoking Signal, then Exit system call voluntarily wakes up all the processes waiting for it.
+
+When several processes running concurrently share a resource (shared memory or file) it is necessary to synchronize 
+access to the shared resource to avoid data inconsistency. Wait and Signal form one pair of primitives that help to 
+achieve synchronization. In general, synchronization primitives help two co-operating processes to ensure that one 
+process stops execution at certain program point, and waits for the other to issue a signal, before continuing execution. 
+
+
+
+suppose process B had finished using the shared resource and had executed Signal system call before process A executed 
+Wait system call, then process A will wait for process B to issue another signal. Hence if process B does not issue 
+another signal, then process A will resume execution only after process B terminates. The issue here is that, although 
+the OS acts on the occurance of a signal immediately, it never records the occurance of the signal for the future. In 
+other words, Signals are memoryless. A more advanced synchronization primitive that has a state variable associated 
+with it - namely the semaphore - will be added to the OS in the next stage. 

@@ -1,0 +1,134 @@
+alias userSP R0; 
+alias physicalPageNum R1;
+alias offset R2;
+alias Addr R3;
+alias call_num R4;
+alias req_PID R5;
+alias physicalAddrRetVal R6;
+alias i R7;
+
+//Switch to kernel stack
+userSP=SP;
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP; 
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1; 
+
+//get the call num. it is at sp-5 
+
+physicalPageNum = [PTBR + 2 * ((userSP - 5)/ 512)];
+offset = (userSP - 5) % 512;
+Addr = (physicalPageNum * 512) + offset;
+
+call_num=[Addr];
+
+//In get pid and get ppid , mode flag need not be written tbh. in the algo in site its not there . But it doesnt hurt to do it properly.
+
+//get pid 
+if(call_num==11) then
+
+    //mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 11; 
+
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = [PROCESS_TABLE + 16 * [SYSTEM_STATUS_TABLE+1] + 1];
+
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+    //reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	ireturn;
+
+endif;
+
+//get ppid
+if(call_num==12) then
+
+    //mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 12; 
+
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = [PROCESS_TABLE + 16 * [SYSTEM_STATUS_TABLE+1] + 2];
+
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+    //reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+	ireturn;
+
+endif;
+
+//wait syscall
+if(call_num==13) then 
+
+    //mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 13; 
+	
+	//argument 1 is pid
+	physicalPageNum = [PTBR + 2 * ((userSP - 4)/ 512)];
+	offset = (userSP - 4) % 512;
+	Addr = (physicalPageNum * 512) + offset;
+	req_PID=[Addr];
+
+
+	if(req_PID<0 || req_PID>=16 || req_PID==[SYSTEM_STATUS_TABLE+1] || [PROCESS_TABLE+req_PID*16+4]==TERMINATED) then
+		
+		//return -1 as its failure
+		physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+		
+		//changing back to user stack
+		SP = userSP;
+
+		ireturn;
+	endif;
+
+    //state field is a tuple (2words) (WAIT_PROCESS,pid)
+	[PROCESS_TABLE + 16 * [SYSTEM_STATUS_TABLE + 1] + 4] = WAIT_PROCESS;
+	[PROCESS_TABLE + 16 * [SYSTEM_STATUS_TABLE + 1] + 5] = req_PID;
+
+	backup;
+		call MOD_5;
+	restore;
+
+	//reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	//Setting return value to 0
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = 0;
+
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+	ireturn;
+
+endif;
+
+//signal syscall
+if(call_num==14) then
+
+	//mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 14;
+
+    //check if any process was waiting for the signal from current process and if yes change them from wait to ready.
+	i=0;
+	while(i<=15) do
+		if ([PROCESS_TABLE + i*16 + 4]==WAIT_PROCESS && 
+			[PROCESS_TABLE + i*16 + 5]==[SYSTEM_STATUS_TABLE+1]) then
+				[PROCESS_TABLE + i*16 + 4]=READY;
+		endif;
+		i=i+1;
+	endwhile;
+
+	//reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	//Setting return value to 0
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = 0;
+
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+	ireturn;
+
+endif;

@@ -49,6 +49,20 @@ endif;
 //Exit process function
 if(functionNum==3) then 
 
+    if([PROCESS_TABLE + currentPID * 16 + 9] != 9) then
+		alias i R3;
+		i=0;
+		while(i<=15) do
+			if([PROCESS_TABLE+16*i+4]==WAIT_PROCESS && [PROCESS_TABLE+i*16+5]==currentPID) then
+				[PROCESS_TABLE+16*i+4]=READY;
+			endif;
+			if([PROCESS_TABLE+16*i+2]==currentPID) then
+				[PROCESS_TABLE+16*i+2]=-1;
+			endif;
+			i=i+1;
+		endwhile;
+	endif;
+    
 	//Free page table Entries
 	backup;
 	R1=4;
