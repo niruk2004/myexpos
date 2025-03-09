@@ -1,0 +1,173 @@
+//semlock and semunlock
+
+alias userSP R0; 
+alias physicalPageNum R1;
+alias offset R2;
+alias Addr R3;
+alias call_num R4;
+alias semaphore_descriptor R5;
+alias userAreaPageNo R6;
+alias sem_index R7;
+alias i R8;
+alias physicalAddrRetVal R9;
+
+userSP = SP;
+
+//Switching to kernel stack
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP;
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+//get the syscall
+
+physicalPageNum = [PTBR + 2 * ((userSP - 5)/ 512)];
+offset = (userSP - 5) % 512;
+Addr = (physicalPageNum * 512) + offset;
+
+call_num=[Addr];
+
+
+//semlock
+if(call_num==19) then
+
+	//mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 19;
+
+	physicalPageNum = [PTBR + 2 * ((userSP - 4)/ 512)];
+	offset = (userSP - 4) % 512;
+	Addr = (physicalPageNum * 512) + offset;
+
+	semaphore_descriptor = [Addr];
+
+	userAreaPageNo = [PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+11];
+
+    //FAILURE
+	if(semaphore_descriptor<0 || semaphore_descriptor>=8 || 
+		[userAreaPageNo*512 + (semaphore_descriptor * 2 + 496)]!=1) then
+
+		//return -1
+		physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+		
+		//changing back to user stack
+		SP = userSP;
+
+		ireturn;
+
+	endif;
+
+	sem_index = [userAreaPageNo*512 + (semaphore_descriptor * 2 + 496) +1];
+	
+    //as long as the given sem index is locked by some other process, the process has to wait.
+	while([SEMAPHORE_TABLE + 4*sem_index + 0] != -1 && [SEMAPHORE_TABLE + 4*sem_index + 0]!=[SYSTEM_STATUS_TABLE+1]) do
+
+		[PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+4]=WAIT_SEMAPHORE;
+		[PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+5]=sem_index; 
+
+		backup;
+		call MOD_5;
+		restore;
+
+	endwhile;
+
+    //lock the semaphore
+	[SEMAPHORE_TABLE + 4*sem_index + 0] = [SYSTEM_STATUS_TABLE+1];
+
+
+	//Changing to user stack
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+	//reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	//return 0 to indicate success
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = 0;
+
+	ireturn;
+
+endif;
+
+
+//semunlock
+if(call_num==20) then
+	//mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 20;
+
+	physicalPageNum = [PTBR + 2 * ((userSP - 4)/ 512)];
+	offset = (userSP - 4) % 512;
+	Addr = (physicalPageNum * 512) + offset;
+
+	semaphore_descriptor = [Addr];
+
+	userAreaPageNo = [PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+11];
+
+    //FAILURE
+	if(semaphore_descriptor<0 || semaphore_descriptor>=8 || 
+		[userAreaPageNo*512 + (semaphore_descriptor * 2 + 496)]!=1) then
+
+		//return -1
+		physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+		
+		//changing back to user stack
+		SP = userSP;
+
+		ireturn;
+
+	endif;
+
+	sem_index = [userAreaPageNo*512 + (semaphore_descriptor * 2 + 496) +1];
+
+	if([SEMAPHORE_TABLE + 4*sem_index + 0]!=-1) then
+
+        //if the semaphore was locked by some other process:
+		if([SEMAPHORE_TABLE + 4*sem_index + 0]!=[SYSTEM_STATUS_TABLE+1]) then
+			
+            //return -2
+			physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+			[physicalAddrRetVal] = -2;
+
+			//reset mode flag
+			[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+			
+			//changing back to user stack
+			SP = userSP;
+
+			ireturn;
+		endif;
+
+		[SEMAPHORE_TABLE + 4*sem_index + 0]=-1;
+
+		i=0;
+		while(i<=15) do
+			if([PROCESS_TABLE+16*i+4]==WAIT_SEMAPHORE &&
+				[PROCESS_TABLE+16*i+5]==sem_index) then
+
+				[PROCESS_TABLE+16*i+4]=READY;
+			
+			endif;
+			i=i+1;
+		endwhile;
+
+
+	endif;
+
+	//Changing back to user stack
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+	//reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	//return 0	
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = 0;
+
+	ireturn;
+
+endif;

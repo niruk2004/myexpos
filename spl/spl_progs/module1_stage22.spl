@@ -35,6 +35,26 @@ if(functionNum==2) then
 	alias userAreaPageNo R3;
 	userAreaPageNo=[PROCESS_TABLE + currentPID*16 + 11];
 
+    alias i R4;
+    i = 496;
+
+    //release semaphores
+    while (i < 512) do
+        if ([userAreaPageNo*512 + i] == 1) then 
+
+            //release semaphore function
+            backup;
+            R1 = 7;
+            R2 = [[PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 + i + 1];
+            R3 = [SYSTEM_STATUS_TABLE+1];
+            call MOD_0;
+            restore;
+            
+        endif;
+        i = i + 2;
+    endwhile;
+
+    //release page
 	backup;
 	R1=2;
 	R2=userAreaPageNo;
@@ -56,6 +76,7 @@ if(functionNum==3) then
 			if([PROCESS_TABLE+16*i+4]==WAIT_PROCESS && [PROCESS_TABLE+i*16+5]==currentPID) then
 				[PROCESS_TABLE+16*i+4]=READY;
 			endif;
+			//orphan
 			if([PROCESS_TABLE+16*i+2]==currentPID) then
 				[PROCESS_TABLE+16*i+2]=-1;
 			endif;

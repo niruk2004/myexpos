@@ -134,7 +134,14 @@ ind=496;
 while(ind<512) do
 
 	[ [PROCESS_TABLE+16*new_pid+11]*512 + ind]=[[PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+11]*512 + ind];	
-	ind=ind+1;
+    [ [PROCESS_TABLE+16*new_pid+11]*512 + ind + 1]=[[PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+11]*512 + ind + 1];
+
+    //if it is a semaphore update the process count in the semaphore table
+    if ([[PROCESS_TABLE + (new_pid*16 + 11)]*512 + ind] == 1) then 
+            [SEMAPHORE_TABLE + [[PROCESS_TABLE + (new_pid*16) + 11]*512 + ind + 1]*4 + 1] = [SEMAPHORE_TABLE + [[PROCESS_TABLE + (new_pid*16) + 11]*512 + ind + 1]*4 + 1] + 1;
+    endif;
+
+	ind=ind+2;
 
 endwhile;
 

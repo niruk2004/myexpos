@@ -96,7 +96,7 @@ PTLR = 10;
 alias counter R0; 
 
 counter = 2;
-while (counter < 16) do
+while (counter < MAX_PROC_NUM) do
     [PROCESS_TABLE + (counter * 16) + 4] = TERMINATED;
     counter = counter + 1;
 endwhile;
@@ -130,6 +130,14 @@ while(counter < 512) do
     counter = counter + 1;
 endwhile;
 
+//initializing SEMAPHORE_TABLE
+counter = 0;
+while (counter < MAX_SEM_COUNT) do
+    [SEMAPHORE_TABLE + counter * 4 + 0] = -1;
+    [SEMAPHORE_TABLE + counter * 4 + 1] = 0;
+    counter = counter+1;
+endwhile;   
+
 // set the resource tables to 0
 [TERMINAL_STATUS_TABLE + 0] = 0;
 [DISK_STATUS_TABLE + 0] = 0;
@@ -137,8 +145,13 @@ endwhile;
 // currently executing process - CURRENT_PI -> start with IDLE process
 [SYSTEM_STATUS_TABLE + 1] = 0;
 // MEM_FREE_COUNT
-[SYSTEM_STATUS_TABLE + 2] = NUM_MEM_PAGES - 82;
+[SYSTEM_STATUS_TABLE + 2] = NUM_MEM_PAGES - 83;
 // WAIT_MEM_COUNT
 [SYSTEM_STATUS_TABLE + 3] = 0;
+
+// used to manage count of context switches, mem usages & disk access respectively
+[SYSTEM_STATUS_TABLE + 24] = 0; //context switches
+[SYSTEM_STATUS_TABLE + 25] = 0; //memory usages
+[SYSTEM_STATUS_TABLE + 26] = 0; //disk access
 
 return;

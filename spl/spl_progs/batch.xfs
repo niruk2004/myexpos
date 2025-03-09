@@ -1,21 +1,23 @@
 fdisk
-load --os $HOME/myexpos/spl/spl_progs/os_stage21.xsm
+load --os $HOME/myexpos/spl/spl_progs/os_stage22.xsm
 load --library $HOME/myexpos/expl/library.lib
-load --module 0 $HOME/myexpos/spl/spl_progs/module0_stage18.xsm
-load --module 1 $HOME/myexpos/spl/spl_progs/module1_stage21.xsm
+load --module 0 $HOME/myexpos/spl/spl_progs/module0_stage22.xsm
+load --module 1 $HOME/myexpos/spl/spl_progs/module1_stage22.xsm
 load --module 2 $HOME/myexpos/spl/spl_progs/module2_stage19.xsm
 load --module 4 $HOME/myexpos/spl/spl_progs/module4_stage18.xsm
 load --module 5 $HOME/myexpos/spl/spl_progs/module5_stage20.xsm
-load --module 7 $HOME/myexpos/spl/spl_progs/boot_mod_stage20.xsm
+load --module 7 $HOME/myexpos/spl/spl_progs/module7_stage22.xsm
 load --int=timer $HOME/myexpos/spl/spl_progs/timer_stage14.xsm
 load --int=console $HOME/myexpos/spl/spl_progs/console_int_stage16.xsm
 load --int=disk $HOME/myexpos/spl/spl_progs/diskint_stage18.xsm
 load --int=6 $HOME/myexpos/spl/spl_progs/int6_stage16.xsm
 load --int=7 $HOME/myexpos/spl/spl_progs/int7_stage15.xsm
-load --int=8 $HOME/myexpos/spl/spl_progs/int8_stage20.xsm
+load --int=8 $HOME/myexpos/spl/spl_progs/int8_stage22.xsm
 load --int=9 $HOME/myexpos/spl/spl_progs/int9_stage19.xsm
 load --int=10 $HOME/myexpos/spl/spl_progs/int10_stage20.xsm
 load --int=11 $HOME/myexpos/spl/spl_progs/int11_stage21.xsm
+load --int=13 $HOME/myexpos/spl/spl_progs/int13_stage22.xsm
+load --int=14 $HOME/myexpos/spl/spl_progs/int14_stage22.xsm
 load --int=15 $HOME/myexpos/spl/spl_progs/int15_stage21.xsm
 load --exhandler $HOME/myexpos/spl/spl_progs/exception_stage19.xsm
 load --idle $HOME/myexpos/expl/expl_progs/idle_process.xsm 
@@ -23,3 +25,8 @@ load --init $HOME/myexpos/expl/expl_progs/shell2s21.xsm
 load --exec $HOME/myexpos/expl/expl_progs/e1to100.xsm
 load --exec $HOME/myexpos/expl/expl_progs/o1to100.xsm
 load --exec $HOME/myexpos/expl/expl_progs/s20q1.xsm
+load --exec $HOME/myexpos/expl/expl_progs/pid.xsm
+load --exec $HOME/myexpos/expl/expl_progs/s21q2.xsm
+load --exec #HOME/myexpos/expl/expl_progs/s22q1.xsm
+load --exec #HOME/myexpos/expl/expl_progs/s22q2.xsm
+load --exec #HOME/myexpos/expl/expl_progs/child.xsm

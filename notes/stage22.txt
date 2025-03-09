@@ -1,0 +1,352 @@
+Semaphores:
+
+
+Resource sharing in expos:
+It was already noted that the child process shares the heap of the parent process. Hence memory allocated 
+in the heap will be a shared memory between both the processes. However, if either the parent or the 
+child process loads another program into its virtual address space using the exec system call, then 
+the shared heap is detached from that process and the surviving process will have the heap intact. 
+The file pointers handled by the parent process are also shared by the child process.
+
+Thus, eXpOS does not support any explicit primitives for memory sharing, but instead allows related 
+processes to share these resources implicitly using the fork system call semantics. 
+
+
+
+Semaphores are primitives that allow concurrent processes to handle the critical section problem. 
+A typical instance of the critical section problem occurs when a set of processes share memory or files. 
+Here it is likely to be necessary to ensure that the processes do not access the shared data (or file) 
+simultaneously to ensure data consistency. eXpOS provides binary semaphores which can be used by user 
+programs (ExpL programs) to synchronize the access to the shared resources so that data inconsistency 
+will not occur.
+
+There are four actions related to semaphores that a process can perform. Below are the actions along 
+with the corresponding eXpOS system calls -
+1) Acquiring a semaphore - Semget system call
+2) Releasing a semaphore - Semrelease system call
+3) Locking a semaphore - SemLock system call
+4) Unlocking a semaphore - SemUnLock system call
+
+To use a semaphore, first a process has to acquire a semaphore. When a process forks, the semaphores 
+currently acquired by a process is shared between the child and the parent. A process can lock and 
+unlock a semaphore only after acquiring the semaphore. The process can lock the semaphore when it needs 
+to enter into the critical section. After exiting from the critical section, the process unlocks the 
+semaphore allowing other processes (with which the semaphore is shared) to enter the critical section. 
+After the use of a semaphore is finished, a process can detach the semaphore by releasing the semaphore. 
+
+
+
+so mainly in this stage , there is the implementation of 6 functions 
+Semget
+semrelease
+aquire semaphore
+release semaphore
+semlock
+SemUnlock
+
+
+NOTE:
+sem_index -> index in semaphore table
+sem descriptor -> index in resource table
+
+
+semget is used to load the semaphore to the semaphore table and then to the resource table of the process. It uses 
+aquire semaphore which returns the sem index which is then entered in the resource table of the process by semget.
+semget returns sem descriptor.
+
+semrelease takes in the semaphore descriptor and checks for validity of the index and if correct, 
+will call the release semaphore function. semrelease takes in sem descriptor.
+
+aquire semaphore is used to check for free entry in semaphore table and then returns the semindex. it also changes the 
+count to 1 in the semaphore process count. it only takes in pid (which is also pretty much not used)
+
+release semaphore calls basically takes in the sem index and checks if its valid. if yes , it checks if the current process 
+is the one locking it. if yes, it makes the locking pid -1 and then change all the processes waiting for the semaphore to ready. 
+it also decreases the number of processes sharing the semaphore by 1.
+
+semlock takes in the sem descriptor and checks its validity. if yes , it checks if the semaphore is locked by some other process 
+other than the current process. as long it is another process, it changes the state of the current process to wait semaphore 
+and then calls the scheduler. if it was locked by the current process or was in unlocked state, it changes the locking pid 
+of the semaphore to pid of the current process in the semaphore table and returns.
+
+semunlock takes in the sem descriptor and checks its validity. if yes, it checks if the semaphore is locked by some process.
+If yes, it checks if it was locked by some other process (not the current process).if yes then return -2. if it was locked 
+by the current process, then set the locking pid to -1, and then change the state of all the processes waiting for this 
+semaphore to be READY. now return.
+
+
+FOr the assgn q2:
+for calculating the number of disk accesses we cud just increment the count in aquire disk in mod 0
+for calculating the number of context switches, we incrememnt the count in module 5
+for calculating the maximum number of memory pages used we regularly check the number of pages used in timer.
+
+
+
+ans q2:
+
+    ---Enter---
+    s22q2.xsm
+    0
+    0
+    6
+    7
+    0
+    0
+    8
+    9
+    400
+    600
+    700
+    900
+    200
+    300
+    500
+    800
+    601
+    301
+    401
+    501
+    701
+    801
+    901
+    201
+    602
+    202
+    302
+    402
+    502
+    702
+    802
+    902
+    603
+    303
+    403
+    503
+    703
+    803
+    903
+    203
+    604
+    204
+    304
+    404
+    504
+    704
+    804
+    904
+    605
+    405
+    705
+    805
+    905
+    205
+    305
+    505
+    606
+    206
+    306
+    406
+    506
+    706
+    806
+    906
+    607
+    207
+    307
+    407
+    507
+    707
+    807
+    907
+    608
+    308
+    408
+    508
+    708
+    808
+    908
+    208
+    609
+    209
+    309
+    409
+    509
+    709
+    809
+    909
+    ---Enter---
+    Shutdown
+    contextSwitch
+    4786
+    -----
+    memUsage:-
+    125
+    -----
+    diskAccess:-
+    3
+    shutdown sys
+    Machine is halting.
+
+
+q3:
+SEQUENTIAL :
+    ---Enter---
+    mergeS.xsm
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+    13
+    14
+    15
+    16
+    17
+    18
+    19
+    20
+    21
+    22
+    23
+    24
+    25
+    26
+    27
+    28
+    29
+    30
+    31
+    32
+    33
+    34
+    35
+    36
+    37
+    38
+    39
+    40
+    41
+    42
+    43
+    44
+    45
+    46
+    47
+    48
+    49
+    50
+    51
+    52
+    53
+    54
+    55
+    56
+    57
+    58
+    59
+    60
+    61
+    62
+    63
+    64
+    ---Enter---
+    Shutdown
+    contextSwitch
+    7575
+    -----
+    memUsage:-
+    91
+    -----
+    diskAccess:-
+    3
+    shutdown sys
+    Machine is halting.
+
+
+Concurrent:
+---Enter---
+    mergeC.xsm
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    9
+    10
+    11
+    12
+    13
+    14
+    15
+    16
+    17
+    18
+    19
+    20
+    21
+    22
+    23
+    24
+    25
+    26
+    27
+    28
+    29
+    30
+    31
+    32
+    33
+    34
+    35
+    36
+    37
+    38
+    39
+    40
+    41
+    42
+    43
+    44
+    45
+    46
+    47
+    48
+    49
+    50
+    51
+    52
+    53
+    54
+    55
+    56
+    57
+    58
+    59
+    60
+    61
+    62
+    63
+    64
+    ---Enter---
+    Shutdown
+    contextSwitch
+    14355
+    -----
+    memUsage:-
+    128
+    -----
+    diskAccess:-
+    4
+    shutdown sys
+    Machine is halting.
+

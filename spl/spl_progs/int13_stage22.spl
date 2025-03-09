@@ -1,0 +1,160 @@
+//semget and semrelease
+
+alias userSP R0; 
+alias physicalPageNum R1;
+alias offset R2;
+alias Addr R3;
+alias call_num R4;
+alias free_entry R5;
+alias i R6;
+alias userAreaPageNo R7;
+alias physicalAddrRetVal R8;
+alias semaphore_descriptor R9;
+alias sem_index R10;
+
+userSP = SP;
+
+//Switch to kernel stack
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP; 
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1;
+
+//get call_num
+physicalPageNum = [PTBR + 2 * ((userSP - 5)/ 512)];
+offset = (userSP - 5) % 512;
+Addr = (physicalPageNum * 512) + offset;
+
+call_num=[Addr];
+
+//semget
+if(call_num == 17) then 
+	//mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 17;
+
+	userAreaPageNo = [PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+11];
+	free_entry=-1;
+	i=496;
+	while(i<=511) do
+		if([userAreaPageNo*512+i]==-1) then
+			free_entry=i;
+			break;
+		endif;
+		i=i+2;
+	endwhile;
+
+    //FAILURE
+	if(free_entry==-1) then
+		//return -1 is "Process has reached its limit of resources "
+		physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+		
+		//changing back to user stack
+		SP = userSP;
+
+		ireturn;
+	endif;
+
+	semaphore_descriptor=(free_entry-496)/2;
+
+	backup;
+    //call aquire semaphore
+    R1=6;
+    R2=[SYSTEM_STATUS_TABLE+1];
+    call MOD_0;	
+    sem_index=R0;
+	restore;
+
+    //FAILURE
+	if(sem_index==-1) then
+		//return value is -2 for " 	Number of semaphores has reached its maximum"
+		
+		physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+		[physicalAddrRetVal] = -2;
+
+		//reset mode flag
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+		
+		//changing back to user stack
+		SP = userSP;
+
+		ireturn;
+	endif;
+
+	[userAreaPageNo*512+free_entry]=1; //Setting resource identifier field as semaphore(i.e. 1)
+	
+	//Setting semaphore table in per-process resource table 2nd word of free_entry
+	[userAreaPageNo*512+free_entry+1]=sem_index;	
+
+	//Changing back to user stack
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+	//reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	//return value - semaphore descriptor(SEMID) if Success
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = semaphore_descriptor;
+
+	ireturn;
+endif;
+
+//semrelease
+if(call_num == 18) then
+	
+	//mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 18;
+
+	userAreaPageNo = [PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+11];
+
+	physicalPageNum = [PTBR + 2 * ((userSP - 4)/ 512)];
+	offset = (userSP - 4) % 512;
+	Addr = (physicalPageNum * 512) + offset;
+
+	semaphore_descriptor = [Addr];
+
+    //FAILURE
+	if(semaphore_descriptor < 0 || semaphore_descriptor > 7 
+		|| [userAreaPageNo * 512 + (semaphore_descriptor * 2 + 496)] !=1) then
+
+		//return value is -1 (Semaphore descriptor is invalid)
+		physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+		
+		//changing back to user stack
+		SP = userSP;
+
+		ireturn;
+
+	endif;
+
+	backup;
+    //release sem
+    R1=7;
+    R2=[SYSTEM_STATUS_TABLE+1];
+    R3=[userAreaPageNo * 512 + (semaphore_descriptor * 2 + 496)+1];
+    call MOD_0;
+    
+    if(R0==-1) then
+        print "SemtabIndErr";
+    endif;
+	restore;
+
+	[userAreaPageNo * 512 + (semaphore_descriptor * 2 + 496)] = -1;
+
+	//Changing back to user stack and return to user mode
+	SP = [PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13];
+
+	//reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	//Setting return value to 0 (SUCCESS)
+	physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+	[physicalAddrRetVal] = 0;
+
+	ireturn;
+endif;
