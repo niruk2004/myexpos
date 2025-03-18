@@ -1,2 +1,0 @@
-print "shutdown sys";
-halt;

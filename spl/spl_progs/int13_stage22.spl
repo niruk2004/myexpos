@@ -135,8 +135,8 @@ if(call_num == 18) then
 	backup;
     //release sem
     R1=7;
-    R2=[SYSTEM_STATUS_TABLE+1];
-    R3=[userAreaPageNo * 512 + (semaphore_descriptor * 2 + 496)+1];
+    R2=[userAreaPageNo * 512 + (semaphore_descriptor * 2 + 496)+1];
+	R3=[SYSTEM_STATUS_TABLE+1];
     call MOD_0;
     
     if(R0==-1) then
