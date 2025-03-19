@@ -8,7 +8,11 @@ int main() {
         temp = exposcall("Write", -2, "File Name?");
         temp = exposcall("Read", -1, fileName);
         temp = exposcall("Delete", fileName);
-        temp = exposcall("Write", -2, temp);
+        if (temp == 0 ) then
+            temp = exposcall("Write", -2, "success");
+        else
+            temp = exposcall("Write",-2,"failure");
+        endif;
         return 0;
     end
 }

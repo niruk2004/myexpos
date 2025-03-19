@@ -1,0 +1,161 @@
+//open close and seek
+
+alias userSP R0;
+alias sys_call_no R1;
+alias physicalAddrRetVal R2;
+alias filename R3;
+alias userAreaPageNo R4;
+alias i R5;
+alias PPRT_index R6;
+alias open_file_table_entry R7;
+
+
+alias process_table_start R13;
+
+process_table_start = PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16);
+
+userSP = SP;
+//Switch to kernel stack
+[process_table_start + 13] = SP; 
+SP = [process_table_start + 11] * 512 - 1;
+
+//get the Syscall
+sys_call_no=[([PTBR + 2 * ((userSP - 5)/ 512)] * 512) + (userSP - 5) % 512];
+
+//Return address
+physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+
+//open syscall
+if(sys_call_no==2) then
+	
+	filename = [([PTBR + 2 * ((userSP - 4)/ 512)] * 512) + (userSP - 4) % 512];
+
+	//mode flag
+	[process_table_start + 9] = 2;
+
+	userAreaPageNo = [process_table_start+11];
+
+    //find a free entry in the per-process resource table
+	PPRT_index = -1;
+	i=496;
+	while(i<512) do
+		if([userAreaPageNo*512+i]==-1) then
+			PPRT_index=(i-496)/2;
+			break;
+		endif;
+		i=i+2;
+	endwhile;
+
+	//If no free per-process-resource-table entry is found
+	if(PPRT_index==-1) then
+        //return -3
+		[physicalAddrRetVal] = -3;
+
+		//reset mode flag
+		[process_table_start + 9] = 0;
+
+		//changing back to user stack
+		SP = userSP;
+
+		ireturn;
+	endif;
+
+    //open from resource module to get open file table entry
+		multipush(R0,R1,R2,R3,R4,R5,R6); //if you push R7 open file table entry is gone as we restore
+		R1=3; 
+		R2=filename;
+		call MOD_3;
+		open_file_table_entry = R0;
+		multipop(R0,R1,R2,R3,R4,R5,R6);
+
+
+    //if open fails return 
+	if(open_file_table_entry==-1 || open_file_table_entry==-2) then
+		[physicalAddrRetVal] = open_file_table_entry;
+
+        //reset mode flag
+		[process_table_start + 9] = 0;
+
+		SP = userSP;
+		ireturn;
+	endif;
+
+    //setting per process resource table 
+	[userAreaPageNo*512+(2*PPRT_index+496)] = FILE;
+	[userAreaPageNo*512+(2*PPRT_index+496)+1] = open_file_table_entry;
+
+    //reset mode flag
+	[process_table_start + 9] = 0;
+
+    //switch to user stack
+	SP = userSP;
+
+    //return the per process resource table index for successful completion of the open syscall
+	[physicalAddrRetVal] = PPRT_index;
+
+	ireturn;
+endif;
+
+//close syscall
+if(sys_call_no==3) then 
+
+	//get the file descriptor
+	PPRT_index = [([PTBR + 2 * ((userSP - 4)/ 512)] * 512) + (userSP - 4) % 512];
+
+	//mode flag
+	[process_table_start + 9] = 3;
+
+    //check validity of the file descriptor which was passed as argument
+	if(PPRT_index<0 || PPRT_index>7) then
+        //failure so return -1
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[process_table_start + 9] = 0;
+
+		//change to user stack
+		SP = userSP;
+
+		ireturn;
+	endif;
+
+	userAreaPageNo = [process_table_start+11];
+
+    //if the per process table entry is invalid as in its not file or if there is not entry there at all, return -1
+	if([userAreaPageNo*512+(PPRT_index*2+496)]!=FILE || 
+		[userAreaPageNo*512+(PPRT_index*2+496)]==-1) then
+
+        //return -1
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[process_table_start + 9] = 0;
+
+		//change to user stack
+		SP = userSP;
+		ireturn;
+	endif;
+
+    //get the open file table entry and then call the close function from file manager module
+	open_file_table_entry = [userAreaPageNo*512+(PPRT_index*2+496)+1];
+	backup;
+		R1=4;
+		R2=open_file_table_entry;
+		call MOD_3;
+	restore;
+
+    //invalidate the per process table entry
+	[userAreaPageNo*512+(PPRT_index*2+496)]=-1;
+
+    //mode flag
+	[process_table_start + 9] = 0;
+
+    //switch to user stack
+	SP = userSP;
+
+    //return 0;
+	[physicalAddrRetVal] = 0;
+    
+	ireturn;
+
+endif;

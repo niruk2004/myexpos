@@ -1,0 +1,16 @@
+File Read:
+
+
+Difference between open instance count and file open count:
+    open instance count refers to the count of the same instance acorss different processes.
+    file open count refers to the total number of open files...i.e number of different instances. 
+    open instance count is present in the open file table and it can have duplicate filename entry 
+    but with a different lseek value denoting a different instance.
+
+
+Reading from the root file does not require a buffer, as root file is already loaded into the memory at 
+boot-time. Memory copy of the root file is present in memory page 62 and the start address of this page 
+is denoted by the SPL constant ROOT_FILE. The word in the root file at LSEEK position is copied into the 
+address provided. Note that the memory address provided as argument is a logical address, and as system 
+call runs in kernel mode logical address should be translated to physical address before storing data.
+

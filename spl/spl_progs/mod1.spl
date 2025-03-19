@@ -38,8 +38,9 @@ if(functionNum==2) then
     alias i R4;
     i = 496;
 
-    //release semaphores
+    //release resource table
     while (i < 512) do
+		//release semaphores
         if ([userAreaPageNo*512 + i] == 1) then 
 
             //release semaphore function
@@ -49,6 +50,18 @@ if(functionNum==2) then
             R3 = [SYSTEM_STATUS_TABLE+1];
             call MOD_0;
             restore;
+
+
+		//close files
+		if ([userAreaPageNo*512 + i] == FILE) then
+
+			//close function from file manager module
+			backup;
+			R1=4;
+			R2=[userAreaPageNo*512+i+1];
+			call MOD_3;
+			restore;
+		endif;
             
         endif;
         i = i + 2;
