@@ -58,14 +58,14 @@ if(call_num == 17) then
 
 	semaphore_descriptor=(free_entry-496)/2;
 
-	backup;
+	multipush(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9);
     //call aquire semaphore
     R1=6;
     R2=[SYSTEM_STATUS_TABLE+1];
     call MOD_0;	
     sem_index=R0;
-	restore;
-
+	multipop(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9);
+	
     //FAILURE
 	if(sem_index==-1) then
 		//return value is -2 for " 	Number of semaphores has reached its maximum"
@@ -82,7 +82,7 @@ if(call_num == 17) then
 		ireturn;
 	endif;
 
-	[userAreaPageNo*512+free_entry]=1; //Setting resource identifier field as semaphore(i.e. 1)
+	[userAreaPageNo*512+free_entry]=1; //Setting resource identifier field as semaphore(i.e. 1) also in site this is done earlier but this is the correct way.
 	
 	//Setting semaphore table in per-process resource table 2nd word of free_entry
 	[userAreaPageNo*512+free_entry+1]=sem_index;	

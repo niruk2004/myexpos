@@ -8,9 +8,15 @@ alias userAreaPageNo R4;
 alias i R5;
 alias PPRT_index R6;
 alias open_file_table_entry R7;
-
-
 alias process_table_start R13;
+
+
+//used for seek only
+alias inode_index R9;
+alias lseek R10;
+alias file_size R11;
+alias offset R12;
+
 
 process_table_start = PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16);
 
@@ -24,6 +30,7 @@ sys_call_no=[([PTBR + 2 * ((userSP - 5)/ 512)] * 512) + (userSP - 5) % 512];
 
 //Return address
 physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+
 
 //open syscall
 if(sys_call_no==2) then
@@ -156,6 +163,124 @@ if(sys_call_no==3) then
     //return 0;
 	[physicalAddrRetVal] = 0;
     
+	ireturn;
+
+endif;
+
+//seek syscall
+if(sys_call_no==6) then
+
+	PPRT_index = [([PTBR + 2 * ((userSP - 4)/ 512)] * 512) + (userSP - 4) % 512];
+
+	//mode flag
+	[process_table_start + 9] = 6;
+
+	//check valididity of the PPRT_index
+	if(PPRT_index<0 || PPRT_index>7) then
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[process_table_start + 9] = 0;
+
+		//change to user stack
+		SP = userSP;
+		ireturn;
+	endif;
+
+	//get the user area page
+	userAreaPageNo = [process_table_start+11];
+
+	//check if the pprt entry corresponding to the pprt_index is valid or not
+	if([userAreaPageNo*512+(PPRT_index*2+496)]==-1) then
+
+		[physicalAddrRetVal] = -1;
+
+		//reset mode flag
+		[process_table_start + 9] = 0;
+
+		//change to user stack
+		SP = userSP;
+		ireturn;
+	endif;
+	
+	open_file_table_entry = [userAreaPageNo*512+(PPRT_index*2+496)+1];
+	inode_index = [OPEN_FILE_TABLE + 4*open_file_table_entry + 0];
+
+	//Acquiring Inode
+	backup;
+		R1=4;
+		R2=inode_index;
+		R3=[SYSTEM_STATUS_TABLE+1];
+		call MOD_0;
+
+
+		if(R0==-1) then
+			restore;
+			[physicalAddrRetVal]=-1;
+
+			//change to user stack
+			SP = userSP;
+
+			//reset mode flag
+			[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+			ireturn;
+		endif;
+	restore;
+
+
+	lseek = [OPEN_FILE_TABLE + 4*open_file_table_entry + 2];
+
+	//if its root file file size is 480 (even if its not filled with files it contains data that files are present or not so 480 is constant)
+	if(inode_index==INODE_ROOT) then
+		file_size=480;
+	else
+		file_size = [INODE_TABLE+16*inode_index+2];
+	endif;
+
+	offset = [([PTBR + 2 * ((userSP - 3)/ 512)] * 512) + (userSP - 3) % 512];
+
+	if(lseek+offset < 0) then
+		//Releasing Inode
+		backup;
+			R1=5;
+			R2=inode_index;
+			R3=[SYSTEM_STATUS_TABLE + 1];
+			call MOD_0;
+		restore;
+		[physicalAddrRetVal]=-2;
+		//changing back to user stack
+		SP = userSP;
+
+		//reset mode flag (0 indicates process is in user mode).
+		[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+		ireturn;
+	endif;
+
+	if(offset==0) then
+		[OPEN_FILE_TABLE + 4*open_file_table_entry + 2]=0;
+	else
+		if(lseek + offset > file_size) then
+			[OPEN_FILE_TABLE + 4*open_file_table_entry + 2]=file_size;
+		else
+			[OPEN_FILE_TABLE + 4*open_file_table_entry + 2]=lseek+offset;
+		endif;
+	endif;
+
+	
+	//Releasing Inode
+	backup;
+		R1=5;
+		R2=inode_index;
+		R3=[SYSTEM_STATUS_TABLE + 1];
+		call MOD_0;
+	restore;
+
+	[physicalAddrRetVal]=0;
+	//changing back to user stack
+	SP = userSP;
+
+	//reset mode flag (0 indicates process is in user mode).
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
 	ireturn;
 
 endif;

@@ -2,8 +2,8 @@
 
 alias functionNum R1;
 
-//buffer read
-if(functionNum==2) then
+//buffer read (2) and buffer write (1)
+if(functionNum==2 || functionNum==1) then
 
 	alias block_no R12;
 	alias offset R13;
@@ -35,7 +35,7 @@ if(functionNum==2) then
 				R1=1;
 				R2=[SYSTEM_STATUS_TABLE+1];
 				R3=71+buffer_no;
-				R4=block_no;
+				R4=[BUFFER_TABLE+4*buffer_no+0];
 				call MOD_4;
 			restore;
 
@@ -58,8 +58,20 @@ if(functionNum==2) then
 
 	endif;
 
-	//the contents in the offset location is copied to the memory location passed as argument
-	[word] = [(71+buffer_no)*512+offset];
+	//if it was buffered write
+	if(functionNum==1) then
+		//storing word in buffer block
+		[(71+buffer_no)*512+offset]=word;
+		//setting dirty bit as 1
+		[BUFFER_TABLE+4*buffer_no+1]=1;
+	endif;
+
+	//if its buffered read
+	if(functionNum==2) then
+		//the contents in the offset location is copied to the memory location passed as argument
+		[word] = [(71+buffer_no)*512+offset];
+
+	endif;
 
     //buffer release is called
 	backup;

@@ -1,0 +1,39 @@
+int main() {
+    decl 
+        int temp, status, fileDesc, counter;
+        str fileName;
+    enddecl
+    
+    begin 
+        temp = exposcall("Write", -2, "Filename:");
+        temp = exposcall("Read", -1, fileName);
+
+        fileDesc = exposcall("Open", fileName);
+        if (fileDesc == -1) then 
+            temp = exposcall("Write", -2, "Not Found");
+        else 
+            status = exposcall("Seek", fileDesc, 1200);
+            counter = 2000;
+            while (counter <= 2513) do 
+                status = exposcall("Write", fileDesc, counter);
+                counter = counter + 1;
+            endwhile;
+
+            while (1 == 1) do 
+                status = exposcall("Seek", fileDesc, -1);
+                if (status == -2) then 
+                    break;
+                endif;
+                temp = exposcall("Read", fileDesc, counter);
+                status = exposcall("Seek", fileDesc, -1);
+                if (status == -2) then
+                    break;
+                endif;
+                temp = exposcall("Write", -2, counter);
+            endwhile;
+
+            status = exposcall("Close", fileDesc);
+        endif;
+        return 0;
+    end
+}

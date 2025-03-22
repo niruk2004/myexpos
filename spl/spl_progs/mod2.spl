@@ -62,6 +62,22 @@ if(functionNum==2) then
 	return;
 endif;
 
+//get free block
+if(functionNum==3) then
+    alias i R3;
+    i=DISK_FREE_AREA;
+    while (i<DISK_SWAP_AREA) do
+        if ([DISK_FREE_LIST + i] == 0) then
+            [DISK_FREE_LIST + i] = 1;
+            R0 = i;
+            return;
+        endif;
+        i = i + 1;
+    endwhile;
+    R0 = -1;
+    return;
+endif;
+
 //release block
 if(functionNum==4) then 
 

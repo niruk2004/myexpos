@@ -128,7 +128,6 @@ endif;
 
 //DELETE system call
 if(sys_call_no==4) then
-	
 	//Set mode flag
 	[process_table_start + 9] = 4;
 

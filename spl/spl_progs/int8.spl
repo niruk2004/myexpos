@@ -159,7 +159,6 @@ while(ind<512) do
 
 endwhile;
 
-
 //copying per process disk map table from parent to child
 ind = 0;
 while (ind < 10) do 
@@ -201,9 +200,6 @@ while(ind<512) do
 	[child_stack*512+ind] = [parent_stack*512+ind];
 	ind=ind+1;
 endwhile;
-
-
-
 
 //Storing BP on top of kernel stack of newly created process
 [[PROCESS_TABLE+16*new_pid+11]*512] = BP;

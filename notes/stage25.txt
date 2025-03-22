@@ -1,0 +1,27 @@
+File Write:
+
+we use buffered write here. We must allocate new blocks to the file if we try to write to a file 
+where the lseek reached the file size. Also we re replacing the word present in the lseek value so 
+the file size doesn't increase if lseek value is not equal to the file size.
+
+
+Get Free Block function does not take any argument and returns the block number of a free block in 
+the disk. If no free block is found, Get Free Block returns -1. A free block can be found by searching 
+for a free entry in the disk free list from position DISK_FREE_AREA to DISK_SWAP_AREA-1. A free entry 
+in the disk free list is denoted by 0. In the disk, the blocks from 69 to 255 called User blocks, are 
+reserved for allocation to executable and data files. SPL constant DISK_FREE_AREA gives the starting 
+block number for User blocks. DISK_SWAP_AREA gives the starting block number of swap area.
+
+
+
+The Seek operation allows the application program to change the value of the file pointer so that 
+subsequent Read/Write is performed from a new position in the file. The new value of the file pointer
+is determined by adding the offset to the current value. (A negative Offset will move the pointer 
+backwards). An Offset of 0 will reset the pointer to the beginning of the file.
+
+If a positive offset goes beyond the size of the file, the seek position will be set to the file size 
+(in the inode table entry). A negative offset leading to LSeek value below 0 will give an error.
+
+
+my disk store calling in the buffered read and write was wrong. corrected tht. Also removed the print store 
+in the s25q4 to avoid the code being too much. Also cp.xsm was not implemented in this stage. it will be done soon.

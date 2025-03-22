@@ -67,9 +67,11 @@ endif;
 
 //Acquire inode
 if(functionNum==4) then
+
     alias index R2;
     alias currentPID R3;
 	while([FILE_STATUS_TABLE+4*index+0]!=-1) do
+
 		[PROCESS_TABLE+16*currentPID+4]=WAIT_FILE;
 		[PROCESS_TABLE+16*currentPID+5]=index;
 		backup;
@@ -93,6 +95,7 @@ endif;
 
 //Release inode
 if(functionNum==5) then
+	
     alias index R2;
 	alias currentPID R3;
 	if(currentPID != [FILE_STATUS_TABLE+4*index+0]) then
@@ -113,7 +116,7 @@ if(functionNum==5) then
 		endif;
 		i=i+1;
 	endwhile;
-
+	
 	R0=0;
 	return;
 
@@ -162,7 +165,7 @@ if(functionNum==7) then
 	endif;
 
 	//checking if it was locked
-	if([SEMAPHORE_TABLE+4*sem_index+0]==[SYSTEM_STATUS_TABLE+1]) then
+	if([SEMAPHORE_TABLE+4*sem_index+0]==currentPID) then
 
 		//unlocking
 		[SEMAPHORE_TABLE+4*sem_index+0]=-1;
