@@ -1,0 +1,22 @@
+User Management :
+
+kernel processes -> idle process , init process (login)
+
+Logout system call is used to logout the current user from the system and does not take 
+any arguments. Logout system call can only be executed from the shell process (PID = 2). 
+
+
+
+so in the current implementation , what happens is that there is option 1 for login and 2 for exit
+exit refers to shutdown
+
+you can shutdown while logged out or when u are logged in too
+
+only root can add new user 
+
+if others try it will try to run but will say BAD COMMAND
+
+rest all works perfectly fine. Will add to this as we go by the next stage.
+Also other system utilities are done.
+
+lu, ls, rm, ru, cat, touch, cp

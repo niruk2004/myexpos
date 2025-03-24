@@ -1,4 +1,4 @@
-//////////////////////////////////// READ SYSTEM CALL //////////////////////////////////
+//READ SYSTEM CALL
 
 //set mode flag of cureent process to 7(read system call)
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 7;

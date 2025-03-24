@@ -1,0 +1,70 @@
+// LOGOUT SYATEM CALL
+
+alias userSP R0; 
+alias physicalAddrRetVal R1;
+alias entry_point R14;
+alias PgTbleOfShell R13;
+
+userSP = SP;
+physicalAddrRetVal = ([PTBR + 2 * ((userSP - 1) / 512)] * 512) + ((userSP - 1) % 512);
+
+//Switching to kernel stack
+[PROCESS_TABLE + ( [SYSTEM_STATUS_TABLE + 1] * 16) + 13] = SP; //Saving sp value in UPTR field
+SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1; //Setting up kernel stack
+
+//Setting mode flag to system call number
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 28;
+
+//If current process is not shell return -1
+if([SYSTEM_STATUS_TABLE+1]!=2) then
+
+	[physicalAddrRetVal] = -1;
+
+	//reset mode flag
+	[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+	//change to user stack
+	SP = userSP;
+
+	ireturn;
+endif;
+
+// Kill all System call
+backup;
+	R1=5;
+	R2=[SYSTEM_STATUS_TABLE+1];
+	call MOD_1;
+restore;
+
+
+//Terminate the shell process. kill all terminated all processes except the idle, login/init and the 
+//process which called the kill all function which is the shell process aka the current process
+[PROCESS_TABLE + 16*[SYSTEM_STATUS_TABLE+1]+4]=TERMINATED;
+
+//get the entry point from the header 
+PgTbleOfShell = PAGE_TABLE_BASE+40;
+entry_point = [[PgTbleOfShell+8]*512+1];
+
+//set the entry point in the starting of the stack 
+[[PgTbleOfShell+16]*512] = entry_point;
+
+//resetting the usersp field to 4096
+[PROCESS_TABLE+16*2+13]=8*512;
+
+//set the state of the init/login process as READY
+[PROCESS_TABLE+16*1+4]=READY;
+
+//set the current user id in the system status table as kernel.
+[SYSTEM_STATUS_TABLE] = 0;
+
+//Invoke Scheduler
+multipush(R0,R1,R13,R14);
+call MOD_5;
+multipop(R0,R1,R13,R14);
+
+SP = userSP;
+
+//reset mode flag
+[PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 0;
+
+ireturn;

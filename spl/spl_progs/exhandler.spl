@@ -1,13 +1,13 @@
 [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 9] = -1; //setting mode flag to -1
 
 // rewriting the SP to kernel stack base
-alias userSP R5;
 [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 13] = SP;
-userSP = SP;
 // set the value of SP to the beginning of User Area Page
 SP = [PROCESS_TABLE + [SYSTEM_STATUS_TABLE+1]*16 + 11]*512 - 1;
 
 backup;
+alias userSP R5;
+userSP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE+1]*16) + 13] ;
 multipush(EIP);
 
 if(EC != 0 || userSP == PTLR*512 - 1) then 
@@ -16,6 +16,7 @@ if(EC != 0 || userSP == PTLR*512 - 1) then
     else
         if(EC == 1) then
             print "INSTR_ERR";
+            breakpoint;
         endif;
         if(EC == 2) then
             print "MEM_ERR";

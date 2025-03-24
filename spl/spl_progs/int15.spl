@@ -12,8 +12,8 @@ SP = [PROCESS_TABLE + ([SYSTEM_STATUS_TABLE + 1] * 16) + 11] * 512 - 1; //Settin
 //Setting mode flag to system call number
 [PROCESS_TABLE + [SYSTEM_STATUS_TABLE + 1] * 16 + 9] = 21;
 
-//check if its the init process itself that calls the shudown 
-if([SYSTEM_STATUS_TABLE+1]!=1 || [PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+3]!=1) then
+//check if the process which called shutdown is shell itself and the user is root itself
+if([SYSTEM_STATUS_TABLE+1]!=2 && [PROCESS_TABLE+16*[SYSTEM_STATUS_TABLE+1]+3]!=1) then
 	[physicalAddrRetVal] = -1;
 
 	//reset mode flag (0 indicates process is in user mode).
