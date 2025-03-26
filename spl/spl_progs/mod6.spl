@@ -1,0 +1,218 @@
+alias functionNum R1;
+alias currentPID R2;
+
+//swap out (1)
+if (functionNum == 1) then
+    //to select which process to swap out, we first check if there is a process in WAIT_PROCESS state.
+    //if not, we check if there is a process in WAIT_SEMAPHORE state. if that too is not there, then 
+    //we select the process with the highest tick which is not running, terminated, allocated or swapped.
+
+    alias swapPID R3;
+    swapPID = -1;
+
+    alias waitSemPID R10;
+    waitSemPID = -1;
+    
+    alias maxTickPID R11;
+    maxTickPID = -1;
+
+    alias maxTICK R12;
+    maxTICK = -1;
+
+    //find a process to swap out (check if the swap status is 0 and if the current status is waiting for a process) 
+    //the process found should not be idle,init,shell or SWAPPER_DAEMON.
+    alias i R5;
+    i = 3;
+    while (i < MAX_PROC_NUM - 1) do
+        //check if it's a non swapped process
+        if ([PROCESS_TABLE + i*16 + 6] == 0) then
+            if ([PROCESS_TABLE + i*16 + 4] == WAIT_PROCESS) then
+                swapPID = i;
+                break;
+            endif;
+            if (waitSemPID == -1 && [PROCESS_TABLE + i*16 + 4] == WAIT_SEMAPHORE) then
+                waitSemPID = i;
+            endif;
+
+            alias tempPCB R13;
+            tempPCB = PROCESS_TABLE + i*16;
+            if ([tempPCB+4] != TERMINATED && [tempPCB+4] != ALLOCATED && [tempPCB] != RUNNING) then
+                if ([tempPCB] > maxTICK) then
+                    maxTICK = [tempPCB];
+                    maxTickPID = i;
+                endif;
+            endif;
+        endif;
+        i = i + 1;
+    endwhile;
+
+    //assigning the swap id the correct value if there was no WAIT_PROCESS state process available to swap
+    if (swapPID == -1) then
+        if (waitSemPID != -1) then
+            swapPID = waitSemPID;
+        else
+            swapPID = maxTickPID;
+        endif;
+    endif;
+
+    //if we could not find any process to swap out, we just don't swap :)
+    if (swapPID == -1) then
+        [SYSTEM_STATUS_TABLE+5] = 0;
+        R0 = -1;
+        return;
+    endif;
+
+    //reset tick field
+    [PROCESS_TABLE + swapPID*16] = 0;
+
+    alias swapPTBR R4;
+    swapPTBR = [PROCESS_TABLE + swapPID*16 + 14];
+
+    i = 4;
+    while (i < 20) do
+        alias pageNumber R6;
+        pageNumber = [swapPTBR + i];
+
+        // heap pages or stack pages
+        if (i <= 6 || i >= 16) then
+            //if its a heap page , then it should be a non shared one.
+            //we use the get swap block to get the block to which you will swap using disk store.
+            if (pageNumber != -1 && [MEMORY_FREE_LIST + pageNumber] == 1) then
+                //get the swap block function is called from memory manager
+                multipush (R1, R2, R3, R4, R5, R6); 
+                R1 = 6; //GET_SWAP_BLOCK
+                call MOD_2;
+                multipop  (R1, R2, R3, R4, R5, R6);
+
+                [DISK_MAP_TABLE + 10*swapPID + (i/2)] = R0;
+
+                multipush (R1, R2, R3, R4, R5, R6);
+                //calling disk store function
+                R1 = 1;
+                R2 = SWAPPER_DAEMON;
+                R3 = pageNumber;
+                R4 = R0;
+                call MOD_4;
+                multipop  (R1, R2, R3, R4, R5, R6);
+            endif;
+        endif;
+
+        //Release page is called
+        if (pageNumber != -1) then
+            multipush (R1, R2, R3, R4, R5);
+            R1 = 2;
+            R2 = pageNumber;
+            call MOD_2;
+            multipop  (R1, R2, R3, R4, R5);
+        endif;
+
+        //invalidating the page table entry
+        [swapPTBR + i] = -1;
+        [swapPTBR + i + 1] = "0000";
+
+        i = i + 2;
+    endwhile;
+
+    //setting the swap flag to 1 in the  process whose pages we swapped
+    [PROCESS_TABLE + swapPID*16 + 6] = 1;
+
+    //incrementing the swappped count by 1 and setting the page status to 0 to indicate the end of swap out 
+    [SYSTEM_STATUS_TABLE+4] = [SYSTEM_STATUS_TABLE+4] + 1;
+    [SYSTEM_STATUS_TABLE+5] = 0;
+    return;
+endif;
+
+//swap in (2)
+if (functionNum == 2) then
+
+    alias swapPID R3;
+    swapPID = -1;
+
+    alias maxTICK R10;
+    maxTICK = 0;
+
+    alias i R5;
+    i = 3;
+    //find the process with READY state and the highest tick among that.
+    while (i < MAX_PROC_NUM - 1) do
+        if ([PROCESS_TABLE + i*16 + 6] == 1 && [PROCESS_TABLE + i*16 + 4] == READY) then
+            if ([PROCESS_TABLE + i*16] > maxTICK) then
+                swapPID = i;
+                maxTICK = [PROCESS_TABLE + i*16];
+            endif;
+        endif;
+        i = i + 1;
+    endwhile;
+
+    //swap in failure
+    if (swapPID == -1) then
+        [SYSTEM_STATUS_TABLE+5] = 0;
+        R0 = -1;
+        return;
+    endif;
+
+    //set tick field to 0
+    [PROCESS_TABLE + swapPID*16] = 0;
+
+    alias swapPTBR R4;
+    swapPTBR = [PROCESS_TABLE + swapPID*16 + 14];
+
+    i = 4;
+    while (i < 20) do
+        //skipping the code pages (code pages will be allocated in exception handler when the process is run)
+        if (i >= 8 && i < 16) then
+            i = i + 2;
+            continue;
+        endif;
+
+        //take the block number from the disk map table
+        alias blockNumber R6;
+        blockNumber = [DISK_MAP_TABLE + swapPID*10 + (i/2)];
+        
+        //check if the block was actually swapped. (the check is mainly applicable for heap. for stack it won't be -1 as they are assigned at the start itself)
+        if (blockNumber != -1) then
+            //call get free page
+            multipush (R1, R2, R3, R4, R5, R6);
+            R1 = 1;
+            call MOD_2;
+            multipop  (R1, R2, R3, R4, R5, R6);
+
+            //Set the page table entry.
+            [swapPTBR + i] = R0;
+            [swapPTBR + i + 1] = "0110";
+            if (i >= 8 && i < 16) then
+                [swapPTBR + i + 1] = "0100";
+            endif;
+
+            //call disk load function
+            multipush (R1, R2, R3, R4, R5, R6);
+            R1 = 2;
+            R2 = SWAPPER_DAEMON;
+            R3 = R0;
+            R4 = blockNumber;
+            call MOD_4;
+            multipop  (R1, R2, R3, R4, R5, R6);
+
+            //release block is called 
+            multipush (R1, R2, R3, R4, R5, R6);
+            R1 = 4;
+            R2 = blockNumber;
+            R3 = SWAPPER_DAEMON;
+            call MOD_2;
+            multipop   (R1, R2, R3, R4, R5, R6);
+            
+            //invalidating the disk table entry after loading from disk
+            [DISK_MAP_TABLE + swapPID*10 + (i/2)] = -1;
+        endif;
+        i = i + 2;
+    endwhile;
+
+    //setting swap flag to 0 to indicate the end of swap in
+    [PROCESS_TABLE + swapPID*16 + 6] = 0;
+
+    //decrement swapped ciunt by 1 and set the paging status to 0
+    [SYSTEM_STATUS_TABLE+4] = [SYSTEM_STATUS_TABLE+4] - 1;
+    [SYSTEM_STATUS_TABLE+5] = 0;
+
+    return;
+endif;

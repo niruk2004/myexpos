@@ -158,3 +158,23 @@ if (functionNum == 5) then
 		return;
     endif;
 endif;
+
+//get swap block
+if (functionNum == 6) then
+    alias i R2;
+    i = DISK_SWAP_AREA; // it is 256 to 512
+    while (i < 512) do
+        if ([DISK_FREE_LIST + i] == 0) then 
+            break;
+        endif;
+        i = i+1;
+    endwhile;
+    if (i == DISK_SIZE) then
+        R0 = -1;
+    else
+        //set the disk free list as 1
+        [DISK_FREE_LIST + i] = 1;
+        R0 = i;
+    endif;
+    return;
+endif;

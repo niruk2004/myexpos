@@ -1,37 +1,55 @@
-//IDLE processs 
-loadi(69, 11);
+// loading exception handler from disk to memory
+loadi (2, 15);
+loadi (3, 16);
 
-//load boot module 
-loadi(54, 67);
-loadi(55, 68);
+// loading timer interrupt from disk to memory
+loadi (4, 17);
+loadi (5, 18);
 
+// loading disk interrupt from disk to memory
+loadi (6, 19);
+loadi (7, 20);
 
+// loading mod 5 from disk to memory
+loadi (50, 63);
+loadi (51, 64);
 
-//load scheduler
-loadi(50,63);
-loadi(51,64);
+// loading mod 7 from disk to memory
+loadi (54, 67);
+loadi (55, 68);
 
-SP = 82*512 - 1;
+// loading the idle code from disk to memory
+loadi (69, 11);
+
+// setting SP to physical address of kernal IDLE stack
+SP = 76 * 512 - 1;
+
+// calling the Boot Module
 call BOOT_MODULE;
-PTBR = PAGE_TABLE_BASE; //page table base register
-PTLR = 10; //10 pages each for IDLE and INIT process
 
+alias processTableEntry R1;
 
-// IDLE process
+// --------------------------------- IDLE PROGRAM ---------------------------------
 
-//library
-[PTBR+0] = -1;
-[PTBR+1] = "0000"; 
-[PTBR+2] = -1;
-[PTBR+3] = "0000";
+// setting up Page Table Base Register and Page Table Length Register
+processTableEntry = PROCESS_TABLE + 0;
+PTBR = PAGE_TABLE_BASE;  //as PID of idle process is 0
+PTLR = 10;
 
-//heap
-[PTBR+4] = -1;
-[PTBR+5] = "0000";
-[PTBR+6] = -1;
-[PTBR+7] = "0000";
+// setting up the page table for idle
+// library
+[PTBR + 0] = -1;
+[PTBR + 1] = "0000";
+[PTBR + 2] = -1;
+[PTBR + 3] = "0000";
 
-//code for IDLE process
+// heap
+[PTBR + 4] = -1;
+[PTBR + 5] = "0000";
+[PTBR + 6] = -1;
+[PTBR + 7] = "0000";
+
+// code
 [PTBR+8] = 69;
 [PTBR+9] = "0100";
 [PTBR+10] = -1;
@@ -41,23 +59,80 @@ PTLR = 10; //10 pages each for IDLE and INIT process
 [PTBR+14] = -1;
 [PTBR+15] = "0000";
 
-//stack
+// stack
 [PTBR+16] = 70;
 [PTBR+17] = "0110";
 [PTBR+18] = -1;
 [PTBR+19] = "0000";
 
+// setting up process table for IDLE
+[processTableEntry + 0] = 0;
+[processTableEntry + 1] = 0; // PID
+[processTableEntry + 4] = RUNNING; // STATE
+[processTableEntry + 11] = 76; //UAPAGENO
+[processTableEntry + 12] = 0; // KPTR
+[processTableEntry + 13] = 8 * 512; //UPTR
+[processTableEntry + 14] = PTBR; 
+[processTableEntry + 15] = PTLR;
+
+// physical address where the stack is stores the virtual entry point
+// first entry of idle stack
 [70*512] = [69*512 + 1];
+
+// --------------------------------- SWAPPER DAEMON ---------------------------------
+
+// setting up Page Table Base Register and Page Table Length Register
+processTableEntry = PROCESS_TABLE + 15 * 16;
+PTBR = PAGE_TABLE_BASE + 15 * 20;  //as PID of idle process is 0
+PTLR = 10;
+
+// setting up the page table for idle
+// library
+[PTBR + 0] = -1;
+[PTBR + 1] = "0000";
+[PTBR + 2] = -1;
+[PTBR + 3] = "0000";
+
+// heap
+[PTBR + 4] = -1;
+[PTBR + 5] = "0000";
+[PTBR + 6] = -1;
+[PTBR + 7] = "0000";
+
+// code
+[PTBR+8] = 69;
+[PTBR+9] = "0100";
+[PTBR+10] = -1;
+[PTBR+11] = "0000";
+[PTBR+12] = -1;
+[PTBR+13] = "0000";
+[PTBR+14] = -1;
+[PTBR+15] = "0000";
+
+// stack
+[PTBR+16] = 81;
+[PTBR+17] = "0110";
+[PTBR+18] = -1;
+[PTBR+19] = "0000";
+
+// setting up process table for IDLE
+[processTableEntry + 0] = 0;
+[processTableEntry + 1] = 15; // PID
+[processTableEntry + 4] = CREATED; // STATE
+[processTableEntry + 11] = 82; //UAPAGENO
+[processTableEntry + 12] = 0; // KPTR
+[processTableEntry + 13] = 8 * 512; //UPTR
+[processTableEntry + 14] = PTBR; 
+[processTableEntry + 15] = PTLR;
+
+// physical address where the stack is stores the virtual entry point
+// first entry of idle stack
+[81*512] = [69*512 + 1];
+
+// stack Ptr set to supposed logical address of Stack 
 SP = 8*512;
 
-[PROCESS_TABLE + 1] = 0; //process id of IDLE is 0
-[PROCESS_TABLE + 4] = RUNNING;
-[PROCESS_TABLE + 11] = 76; //first available free page is 80 (0 - 79 are system reserved)
-[PROCESS_TABLE + 12] = 0;
-[PROCESS_TABLE + 13] = 8*512;
-[PROCESS_TABLE + 14] = PAGE_TABLE_BASE;
-[PROCESS_TABLE + 15] = 10;
-
-[SYSTEM_STATUS_TABLE + 1] = 0; //from stage 12 on we start with the idle process
+PTBR = PAGE_TABLE_BASE;
+PTLR = 10;
 
 ireturn;

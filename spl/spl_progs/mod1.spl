@@ -198,8 +198,8 @@ if(functionNum==5) then //Kill all function
 	endwhile;
 
 	i=2;
-	//Killing all processes except idle and init/login
-	while(i<=MAX_PROC_NUM - 1) do
+	//Killing all processes except idle and init/login and maybe swapper daemon
+	while(i< MAX_PROC_NUM - 1) do
 		if(i!=[SYSTEM_STATUS_TABLE+1] && [PROCESS_TABLE+16*i+4]!=TERMINATED) then
 			backup;
 				R1=3;

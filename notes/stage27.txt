@@ -1,0 +1,77 @@
+Pager Module:
+
+At any time if the OS finds that the available (free) memory drops below a critical level, a swap 
+out is initiated. In such case, the OS identifies a relatively inactive process and swaps out some 
+of the pages of the process to make more free memory available. The critical level in eXpOS is 
+denoted by MEM_LOW (MEM_LOW is equal to 4 in present design). When available memory pages are 
+less than MEM_LOW, eXpOS calls Swap Out function of pager module. Swap Out function selects a 
+suitable process to swap out to the disk. The memory pages used by the selected process are moved 
+into the disk blocks and the memory pages (except the memory pages of the library) are released. 
+The code pages are not required to be copied to the disk as the disk already contains a copy of the 
+code pages. The kernel stack page of a process is also not swapped out by eXpOS. However, the heap 
+and the user stack pages are swapped out into the disk. eXpOS has 256 reserved blocks in the disk 
+(256 to 511 - see disk organization) for swapping purpose. This area is called swap area.
+
+A swapped out process is swapped back into memory, when one of the following events occur:
+
+      1) A process has remained in swapped out state for more than a threshold amount of time.
+      2) The available memory pages exceed certain level denoted by MEM_HIGH (MEM_HIGH is set to 12 
+        in present design).
+
+Each process has an associated TICK value (see process table) which is reset whenever the process is 
+swapped out. The TICK value is incremented every time the system enters the timer interrupt routine. 
+If the TICK value of a swapped out process exceeds the value MAX_TICK, the OS decides that the process 
+must be swapped in. A second condition when the OS decides that a process can be swapped in is when 
+the available number of free memory pages (see MEM_FREE_COUNT in system status table) exceeds the value 
+MEM_HIGH.
+
+When does the OS check for MEM_LOW/MEM_HIGH condition? This is done in the timer interrupt handler. 
+Since the system enters the timer routine at regular intervals, this design ensures that regular 
+monitoring of TICK/MEM_FREE_COUNT is achieved. 
+
+
+ We will modify the eXpOS scheduler to schedule the swapper daemon whenever PAGING_STATUS field in the 
+ system status table is set to SWAP_IN/SWAP_OUT. The OS reserves PID=15 for the swapper daemon process. 
+ (Thus the swapper daemon joins login, shell and idle processess as special processess initiated by the 
+ kernel.) The swapper daemon shares the code of the idle process, and is essentially a duplicate idle 
+ process running with a different PID. Its sole purpose is to set up a user context for swapping operations. 
+ A consequence of the introduction of the swapper daemon is that only 12 user applications can run concurrently now.
+
+If the timer interrupt handler is entered from the context of the swapper daemon, then it will call the 
+Swap-in/Swap-out functions of the pager module after inspecting the value of PAGING_STATUS in the system 
+status table. Thus, swap-in/swap out will be initiated by the timer interrupt handler only from the 
+context of the swapper daemon.
+
+While swapping is ongoing, the swapper daemon may get blocked when swap-in/swap-out operation waits for a 
+disk-memory transfer. The OS scheduler will run the Idle process in such case. Note that the Idle process 
+will never get blocked, and can always be scheduled whenever no other process is ready to run.
+
+Once a swap-in/swap-out is initiated from the timer, the OS scheduler will not schedule any process other 
+than the swapper daemon or the idle process until the swap-in/swap-out is completed. This policy is taken 
+to avoid unpredicatable conditions that can arise if other processes rapidly acquire/release memory and 
+change the memory availability in the system while a swap operation is ongoing. This design, though not 
+very efficient, is simple to implement and yet achieves the goal of having the full quota of 16 process 
+in concurrent execution. (Note that the size of the process table in the eXpOS implementation outlined 
+here limits the number of concurrent processes to 16). 
+
+MAX_TICK = 1000
+MEM_HIGH = 12
+MEM_LOW = 4
+
+the swapping is initiated during timer. we check the swap status from system status table to know whether swap is done or not.
+if status is not zero (i.e either swap in or swap out is being done). then the current process is either idle or the swapper daemon.
+if it is the swapper daemon, we need to call the pager module with appropriate arguments from the system status table.
+if it was the idle process, that means the timer interrupt got triggered while the swapper daemon was blocked for the swapping
+(a disk load maybe). so if it was the idle, then let it be. just proceed as normal timer interrupt.
+
+now we check whether there is scope for a swap. this is done by checking if the mem free count is less than the MEM_LOW or if its higher 
+than MEM_HIGH (a process has to be swapped already in order for the swap in to take place if the mem free count is greater than the MEM_HIGH).
+Swap in can take place if one of the process was swapped out for longer than the MAX_TICK (1000) too. this is checked next. 
+
+if there is no need for swap after this, the timer interrupt proceeds to function as before. (the scheduler will make sure that the swapper
+is scheduled if it was decided that there is a need for swap.)
+
+
+
+
+i changed the mod1 kill all to not kill the daemon.

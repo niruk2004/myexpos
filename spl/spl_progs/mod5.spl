@@ -13,20 +13,42 @@ process_table_entry = PROCESS_TABLE + currentPID * 16;
 
 
 //finding the new process
-alias tempPID R10;
-tempPID=currentPID+1;
 
 alias newPID R2;
 newPID=0;
-tempPID=currentPID+1;
-while(tempPID<=15) do
-	if([ (PROCESS_TABLE + (tempPID * 16)) + 4 ] == READY || [ (PROCESS_TABLE + (tempPID * 16)) + 4 ] == CREATED) then
-		newPID=tempPID;
-		break;
-	endif;
-	tempPID=tempPID+1;
-endwhile;
 
+//check if paging is ongoing
+if ([SYSTEM_STATUS_TABLE+5] != 0) then
+
+    if ([PROCESS_TABLE + 15*16 + 4] == WAIT_DISK) then
+        newPID = 0;
+    else
+        newPID = 15;
+    endif;
+
+else
+	//swapper deamon is excluded
+	alias tempPID R10;
+	tempPID=currentPID+1;
+	while(tempPID<15) do
+		if(([ (PROCESS_TABLE + (tempPID * 16)) + 4 ] == READY || [ (PROCESS_TABLE + (tempPID * 16)) + 4 ] == CREATED ) &&  [PROCESS_TABLE + tempPID*16 + 6] != 1) then
+			newPID=tempPID;
+			break;
+		endif;
+		tempPID=tempPID+1;
+	endwhile;
+
+	if (newPID == 0) then
+		tempPID=0;
+		while(tempPID<currentPID) do
+		if(([ (PROCESS_TABLE + (tempPID * 16)) + 4 ] == READY || [ (PROCESS_TABLE + (tempPID * 16)) + 4 ] == CREATED ) &&  [PROCESS_TABLE + tempPID*16 + 6] != 1) then
+			newPID=tempPID;
+			break;
+		endif;
+		tempPID=tempPID+1;
+		endwhile;
+	endif;
+endif;
 
 alias new_process_table R13;
 new_process_table = PROCESS_TABLE + newPID * 16;
